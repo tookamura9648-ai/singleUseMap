@@ -285,22 +285,19 @@
   // ========= Geocoding (Nominatim) =========
   // NOTE: Nominatim has usage policies; avoid heavy bursts.
   async function geocodeAddress(address){
-  const url = new URL("https://nominatim.openstreetmap.org/search");
-  url.searchParams.set("format", "json");
-  url.searchParams.set("limit", "5");              // ← 1→5に（候補増やす）
+  const url = new URL("/api/geocode", location.origin);
   url.searchParams.set("q", address);
-  url.searchParams.set("accept-language", "ja");
-  url.searchParams.set("countrycodes", "jp");      // ← 日本に絞る
-  url.searchParams.set("addressdetails", "1");
 
-  const res = await fetch(url.toString(), { headers: { "Accept":"application/json" } });
+  const res = await fetch(url.toString(), { headers: { "Accept": "application/json" } });
   if(!res.ok) throw new Error("ジオコーディング失敗");
-  const data = await res.json();
-  if(!data || data.length === 0) return null;
 
-  // いったん一番上を採用
-  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), display: data[0].display_name, candidates: data };
+  const j = await res.json();
+  if(!j.ok) return null;
+  if(!j.found) return null;
+
+  return { lat: j.lat, lng: j.lng, display: j.display };
 }
+
 
 
   // ========= Render =========
