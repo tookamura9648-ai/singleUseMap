@@ -19,7 +19,6 @@
       --line:rgba(255,255,255,.10);
       --accent:#6ea8ff;
       --good:#48d597;
-      --warn:#ffcc66;
       --danger:#ff6b6b;
       --r:16px;
     }
@@ -88,6 +87,7 @@
     .btn.danger{ background: rgba(255,107,107,.12); border-color: rgba(255,107,107,.3); }
     .btn.small{ padding:8px 10px; font-size:13px; }
     .btn.icon{ width:42px; padding:10px 0; }
+    .btn:disabled{ opacity:.55; cursor:not-allowed; }
 
     .status{
       margin-top:8px;
@@ -102,9 +102,7 @@
       background: rgba(255,255,255,.05);
     }
 
-    #mapWrap{
-      padding:12px;
-    }
+    #mapWrap{ padding:12px; }
     #map{
       height: 46vh;
       min-height: 320px;
@@ -176,6 +174,7 @@
       max-width: min(92vw, 540px);
       text-align:center;
       backdrop-filter: blur(8px);
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -207,6 +206,7 @@
         <div class="pill" id="countPill">件数：0</div>
         <div class="pill" id="speechPill">音声：未確認</div>
         <div class="pill" id="geoPill">位置情報：未確認</div>
+        <div class="pill" id="netPill">API：未確認</div>
       </div>
     </div>
   </header>
@@ -228,9 +228,9 @@
       <div class="list" id="list"></div>
 
       <div class="hint">
-        ※音声入力は <b>Chrome系ブラウザ</b>で動作しやすいです。<br>
-        ※音声入力は多くの端末で <b>HTTPS</b> が必要です（ローカルでもOKな場合あり）。<br>
-        ※住所→座標はOpenStreetMapのNominatimを使用（連続大量入力は少し間隔を空けてください）。
+        ※「住所→座標」は Vercel の <b>/api/geocode</b> 経由です（OSM直叩きのブロック回避）。<br>
+        ※住所が見つからない時は「県市から」「建物名・部屋番号を一旦外す」が強いです。<br>
+        ※連続で大量追加する場合は、1秒くらい間隔を空けると安定します（このアプリでも連打防止しています）。
       </div>
     </section>
   </main>
@@ -247,19 +247,24 @@
     toastEl.textContent = msg;
     toastEl.style.display = "block";
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.style.display = "none", 2200);
+    toastTimer = setTimeout(() => toastEl.style.display = "none", 2600);
   }
   function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
   // ========= State =========
-  const STORAGE_KEY = "koguchi_delivery_stops_v1";
-  /** @type {{id:string,name:string,address:string,lat:number,lng:number,status:"pending"|"done",createdAt:number}[]} */
+  const STORAGE_KEY = "koguchi_delivery_stops_v2";
+  const GEO_CACHE_KEY = "koguchi_geo_cache_v1";
+  const ADD_COOLDOWN_MS = 900; // 連打防止
+  let lastAddAt = 0;
+
+  /** @type {{id:string,name:string,address:string,lat:number,lng:number,status:"pending"|"done",createdAt:number,_marker?:any}[]} */
   let stops = [];
 
   // ========= Map =========
-  const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12); // 滋賀付近（初期）
+  const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12); // 滋賀付近
   L.control.zoom({ position: "bottomright" }).addTo(map);
 
+  // 表示地図：OpenStreetMap
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "&copy; OpenStreetMap"
@@ -282,25 +287,89 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stops));
   }
 
-  // ========= Geocoding (Nominatim) =========
-  // NOTE: Nominatim has usage policies; avoid heavy bursts.
+  // ========= Geo cache =========
+  function loadGeoCache(){
+    try{
+      return JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || "{}") || {};
+    }catch(e){
+      return {};
+    }
+  }
+  function saveGeoCache(cache){
+    localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(cache));
+  }
+  function cacheKey(addr){
+    return (addr || "").toString().trim().toLowerCase();
+  }
+
+  // ========= Address normalization / retry =========
+  function normalizeAddress(a){
+    return (a || "")
+      .replace(/[‐-–—−]/g, "-")
+      .replace(/[ 　]+/g, " ")
+      .replace(/(〒\s*\d{3}-?\d{4})/g, "")      // 郵便番号削る
+      .replace(/(号室|室|階|F).*/g, "")        // 部屋/階以降ざっくり削る
+      .trim();
+  }
+
+  // 建物名っぽい語以降を削る（当たり率上げ）
+  function stripBuilding(a){
+    return (a || "")
+      .replace(/(ビル|マンション|ハイツ|コーポ|アパート|タワー|メゾン|レジデンス|ハウス|コート).*/g, "")
+      .trim();
+  }
+
+  // ========= Geocoding via Vercel API =========
   async function geocodeAddress(address){
-  const url = new URL("/api/geocode", location.origin);
-  url.searchParams.set("q", address);
+    const url = new URL("/api/geocode", location.origin);
+    url.searchParams.set("q", address);
 
-  const res = await fetch(url.toString(), {
-    headers: { "Accept": "application/json" }
-  });
-  if(!res.ok) throw new Error("ジオコーディング失敗");
+    const res = await fetch(url.toString(), { headers: { "Accept": "application/json" } });
+    if(!res.ok){
+      let t = "";
+      try { t = await res.text(); } catch(e){}
+      throw new Error(`APIエラー(${res.status})`);
+    }
 
-  const j = await res.json();
-  if(!j.ok || !j.found) return null;
+    const j = await res.json();
+    if(!j.ok) return null;
+    if(!j.found) return null;
 
-  return { lat: j.lat, lng: j.lng, display: j.display };
-}
+    return { lat: j.lat, lng: j.lng, display: j.display };
+  }
 
+  async function geocodeWithFallback(rawAddress){
+    const cache = loadGeoCache();
 
+    // ① 正規化
+    const a1 = normalizeAddress(rawAddress);
+    if(a1){
+      const k = cacheKey(a1);
+      if(cache[k]) return cache[k];
+    }
 
+    // ② まずは a1 で検索
+    let geo = null;
+    if(a1) geo = await geocodeAddress(a1);
+
+    // ③ ダメなら建物名除去して再試行
+    if(!geo){
+      const a2 = stripBuilding(a1);
+      if(a2 && a2 !== a1){
+        const k2 = cacheKey(a2);
+        if(cache[k2]) return cache[k2];
+        geo = await geocodeAddress(a2);
+      }
+    }
+
+    // ④ 成功したらキャッシュ
+    if(geo){
+      const k = cacheKey(a1);
+      cache[k] = geo;
+      saveGeoCache(cache);
+    }
+    return geo;
+  }
 
   // ========= Render =========
   function updatePills(){
@@ -308,7 +377,6 @@
   }
 
   function iconForStop(index, status){
-    // simple numbered label via DivIcon
     const n = index + 1;
     const bg = status === "done" ? "rgba(255,255,255,.18)" : "rgba(110,168,255,.28)";
     const bd = status === "done" ? "rgba(255,255,255,.22)" : "rgba(110,168,255,.55)";
@@ -334,12 +402,10 @@
 
   function redrawMarkers(){
     markersLayer.clearLayers();
-
     stops.forEach((s, i) => {
       const m = L.marker([s.lat, s.lng], { icon: iconForStop(i, s.status) })
         .addTo(markersLayer)
         .bindPopup(`<b>${esc(s.name || "（名称なし）")}</b><br>${esc(s.address)}`);
-      // store marker ref if needed later
       s._marker = m;
     });
   }
@@ -348,14 +414,12 @@
     const list = $("list");
     list.innerHTML = "";
 
-    // Show pending first, then done (but keep numbering by overall order)
-    // If you prefer strict input order, remove sort and just loop stops.
     const pending = stops.filter(s => s.status === "pending");
     const done = stops.filter(s => s.status === "done");
     const ordered = [...pending, ...done];
 
     ordered.forEach((s) => {
-      const idx = stops.findIndex(x => x.id === s.id); // original index for marker number
+      const idx = stops.findIndex(x => x.id === s.id);
       const card = document.createElement("div");
       card.className = "card" + (s.status === "done" ? " done" : "");
       card.innerHTML = `
@@ -388,16 +452,22 @@
       return;
     }
     const latlngs = stops.map(s => [s.lat, s.lng]);
-    const bounds = L.latLngBounds(latlngs);
-    map.fitBounds(bounds.pad(0.22));
+    map.fitBounds(L.latLngBounds(latlngs).pad(0.22));
   }
 
   // ========= Actions =========
   async function addStop(){
-    const name = $("name").value.trim();
-    const address = $("addr").value.trim();
+    const now = Date.now();
+    if(now - lastAddAt < ADD_COOLDOWN_MS){
+      toast("連続追加は少し待ってね");
+      return;
+    }
+    lastAddAt = now;
 
-    if(!address){
+    const name = $("name").value.trim();
+    const addressRaw = $("addr").value.trim();
+
+    if(!addressRaw){
       toast("住所を入力してください");
       $("addr").focus();
       return;
@@ -407,9 +477,11 @@
     $("addBtn").textContent = "…座標化中";
 
     try{
-      const geo = await geocodeAddress(address);
+      // API経由＋正規化＋再試行＋キャッシュ
+      const geo = await geocodeWithFallback(addressRaw);
+
       if(!geo){
-        toast("住所が見つかりませんでした（表記を変えてみてください）");
+        toast("住所が見つかりませんでした。\n・県市から入れる\n・建物名/部屋番号を外す\nを試してください");
         return;
       }
 
@@ -418,7 +490,8 @@
       const stop = {
         id,
         name: name || "",
-        address,
+        // 画面表示は「入力した住所」を優先（displayは揺れるので使わない）
+        address: addressRaw,
         lat: geo.lat,
         lng: geo.lng,
         status: "pending",
@@ -431,10 +504,8 @@
       redrawMarkers();
       renderList();
 
-      // focus latest
       map.setView([stop.lat, stop.lng], 16, { animate:true });
 
-      // clear inputs for next
       $("name").value = "";
       $("addr").value = "";
       $("name").focus();
@@ -442,7 +513,7 @@
       toast("追加しました");
     }catch(e){
       console.error(e);
-      toast("座標化に失敗しました（通信/住所表記を確認）");
+      toast(`座標化に失敗しました。\n${e?.message || "通信/設定を確認"}`);
     }finally{
       $("addBtn").disabled = false;
       $("addBtn").textContent = "＋ 追加（住所→座標→ピン）";
@@ -462,12 +533,11 @@
     const s = stops.find(x => x.id === id);
     if(!s) return;
 
-    // If current location known, provide navigation-friendly URL (Google Maps directions)
+    // Google Maps を外部起動
     const base = new URL("https://www.google.com/maps/dir/");
     if(currentLatLng){
       base.pathname = `/maps/dir/${currentLatLng.lat},${currentLatLng.lng}/${s.lat},${s.lng}/`;
     }else{
-      // fallback: just show destination
       base.pathname = "/maps/search/";
       base.searchParams.set("api", "1");
       base.searchParams.set("query", `${s.lat},${s.lng}`);
@@ -485,7 +555,7 @@
   }
 
   // ========= Geolocation =========
-  async function getLocation(){
+  function getLocation(){
     if(!navigator.geolocation){
       $("geoPill").textContent = "位置情報：非対応";
       toast("位置情報が使えません");
@@ -538,24 +608,30 @@
       toast("音声入力が使えません（Chrome系推奨）");
       return;
     }
-    try{
-      recog.abort(); // reset
-    }catch(e){}
-
+    try{ recog.abort(); }catch(e){}
     toast("話してください…");
     recog.onresult = (ev) => {
       const text = ev.results[0][0].transcript || "";
-      // append if already has text
       const cur = inputEl.value.trim();
       inputEl.value = cur ? (cur + " " + text) : text;
       toast("入力しました");
     };
-    recog.onerror = (ev) => {
-      console.warn(ev);
-      toast("音声入力に失敗（権限/HTTPSを確認）");
-    };
-    recog.onend = () => {};
+    recog.onerror = () => toast("音声入力に失敗（権限/HTTPSを確認）");
     recog.start();
+  }
+
+  // ========= API health check =========
+  async function apiCheck(){
+    try{
+      const url = new URL("/api/geocode", location.origin);
+      url.searchParams.set("q", "滋賀県大津市浜大津");
+      const res = await fetch(url.toString(), { headers: { "Accept":"application/json" } });
+      if(!res.ok) throw new Error("NG");
+      const j = await res.json();
+      $("netPill").textContent = (j && j.ok) ? "API：OK" : "API：NG";
+    }catch(e){
+      $("netPill").textContent = "API：NG";
+    }
   }
 
   // ========= Event bindings =========
@@ -592,15 +668,13 @@
   redrawMarkers();
   renderList();
 
-  // first checks
   if(SpeechRecognition) $("speechPill").textContent = "音声：OK";
   else $("speechPill").textContent = "音声：非対応";
 
   if(navigator.geolocation) $("geoPill").textContent = "位置情報：未取得";
   else $("geoPill").textContent = "位置情報：非対応";
 
-  // Optional: auto get location once
-  // getLocation();
+  apiCheck();
 
 })();
 </script>
