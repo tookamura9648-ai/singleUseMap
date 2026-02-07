@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>小口配送 順路帳（入力＋地図＋リスト）</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#121a33;
+      --panel2:#0f1730;
+      --text:#e9eefc;
+      --muted:#a8b2d6;
+      --line:rgba(255,255,255,.10);
+      --accent:#6ea8ff;
+      --good:#48d597;
+      --warn:#ffcc66;
+      --danger:#ff6b6b;
+      --r:16px;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      background: radial-gradient(1200px 700px at 10% 0%, rgba(110,168,255,.22), transparent 60%),
+                  radial-gradient(900px 600px at 90% 0%, rgba(72,213,151,.18), transparent 55%),
+                  var(--bg);
+      color:var(--text);
+    }
+
+    header{
+      position:sticky; top:0; z-index:50;
+      padding:10px 12px 12px;
+      background: linear-gradient(to bottom, rgba(11,16,32,.95), rgba(11,16,32,.70));
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--line);
+    }
+
+    .row{ display:flex; gap:10px; align-items:center; }
+    .title{
+      font-weight:800;
+      letter-spacing:.03em;
+      font-size:16px;
+      margin:0 0 8px;
+      opacity:.95;
+    }
+
+    .inputGrid{ display:grid; grid-template-columns: 1fr; gap:8px; }
+    .field{
+      display:flex; gap:8px; align-items:center;
+      padding:10px;
+      background: rgba(18,26,51,.85);
+      border:1px solid var(--line);
+      border-radius: var(--r);
+    }
+    .field input{
+      width:100%;
+      border:0;
+      outline:none;
+      background: transparent;
+      color: var(--text);
+      font-size:16px;
+    }
+    .field input::placeholder{ color: rgba(233,238,252,.45); }
+
+    .btn{
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius: 999px;
+      font-weight:700;
+      font-size:14px;
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color: transparent;
+      display:inline-flex; gap:8px; align-items:center; justify-content:center;
+      white-space:nowrap;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn.primary{ background: rgba(110,168,255,.18); border-color: rgba(110,168,255,.35); }
+    .btn.good{ background: rgba(72,213,151,.16); border-color: rgba(72,213,151,.35); }
+    .btn.danger{ background: rgba(255,107,107,.12); border-color: rgba(255,107,107,.3); }
+    .btn.small{ padding:8px 10px; font-size:13px; }
+    .btn.icon{ width:42px; padding:10px 0; }
+
+    .status{
+      margin-top:8px;
+      font-size:12px;
+      color: var(--muted);
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .pill{
+      padding:6px 10px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      background: rgba(255,255,255,.05);
+    }
+
+    #mapWrap{
+      padding:12px;
+    }
+    #map{
+      height: 46vh;
+      min-height: 320px;
+      border-radius: calc(var(--r) + 6px);
+      border:1px solid var(--line);
+      overflow:hidden;
+      box-shadow: 0 16px 50px rgba(0,0,0,.35);
+    }
+
+    main{ padding-bottom: 18px; }
+    .panel{
+      margin: 0 12px 12px;
+      padding: 12px;
+      border-radius: calc(var(--r) + 6px);
+      border:1px solid var(--line);
+      background: rgba(18,26,51,.60);
+      backdrop-filter: blur(8px);
+    }
+
+    .listHeader{
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      margin-bottom: 10px;
+    }
+    .listHeader .meta{ color:var(--muted); font-size:12px; }
+    .list{
+      display:flex; flex-direction:column; gap:10px;
+      max-height: 38vh;
+      overflow:auto;
+      padding-right: 4px;
+    }
+    .card{
+      border:1px solid var(--line);
+      background: rgba(15,23,48,.68);
+      border-radius: var(--r);
+      padding: 10px;
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+    .card.done{ opacity:.55; filter:saturate(.7); }
+    .num{
+      font-weight:900;
+      color: rgba(233,238,252,.9);
+      margin-right:8px;
+    }
+    .name{ font-weight:800; font-size:15px; }
+    .addr{ color: var(--muted); font-size:12.5px; margin-top:2px; line-height:1.35; }
+    .actions{ display:flex; flex-direction:column; gap:8px; justify-content:center; }
+    .hint{
+      color: rgba(233,238,252,.55);
+      font-size:12px;
+      margin-top:10px;
+      line-height:1.45;
+    }
+
+    .toast{
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 14px;
+      z-index: 9999;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.65);
+      border: 1px solid rgba(255,255,255,.12);
+      color: var(--text);
+      font-size: 13px;
+      display:none;
+      max-width: min(92vw, 540px);
+      text-align:center;
+      backdrop-filter: blur(8px);
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="title">小口配送 順路帳（入力＋地図＋リスト）</div>
+
+    <div class="inputGrid">
+      <div class="field">
+        <button class="btn icon" id="micName" title="音声入力（配送先名）">🎤</button>
+        <input id="name" type="text" placeholder="配送先名（例：〇〇商店 / △△様）" autocomplete="off">
+      </div>
+
+      <div class="field">
+        <button class="btn icon" id="micAddr" title="音声入力（住所）">🎤</button>
+        <input id="addr" type="text" placeholder="住所（例：滋賀県大津市〇〇町1-2-3）" autocomplete="off">
+      </div>
+
+      <div class="row" style="justify-content:space-between;">
+        <button class="btn primary" id="addBtn">＋ 追加（住所→座標→ピン）</button>
+        <div class="row">
+          <button class="btn small" id="locBtn">📍 現在地</button>
+          <button class="btn small danger" id="clearBtn">🗑 全消去</button>
+        </div>
+      </div>
+
+      <div class="status">
+        <div class="pill" id="countPill">件数：0</div>
+        <div class="pill" id="speechPill">音声：未確認</div>
+        <div class="pill" id="geoPill">位置情報：未確認</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="mapWrap">
+      <div id="map"></div>
+    </div>
+
+    <section class="panel">
+      <div class="listHeader">
+        <div>
+          <div style="font-weight:900;">配送先リスト</div>
+          <div class="meta">20件以上OK（完了で下がる / 地図は最後に追加した地点を自動フォーカス）</div>
+        </div>
+        <button class="btn small" id="fitBtn">🧭 全体表示</button>
+      </div>
+
+      <div class="list" id="list"></div>
+
+      <div class="hint">
+        ※音声入力は <b>Chrome系ブラウザ</b>で動作しやすいです。<br>
+        ※音声入力は多くの端末で <b>HTTPS</b> が必要です（ローカルでもOKな場合あり）。<br>
+        ※住所→座標はOpenStreetMapのNominatimを使用（連続大量入力は少し間隔を空けてください）。
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  // ========= Utilities =========
+  const $ = (id) => document.getElementById(id);
+  const toastEl = $("toast");
+  let toastTimer = null;
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.style.display = "block";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.style.display = "none", 2200);
+  }
+  function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  // ========= State =========
+  const STORAGE_KEY = "koguchi_delivery_stops_v1";
+  /** @type {{id:string,name:string,address:string,lat:number,lng:number,status:"pending"|"done",createdAt:number}[]} */
+  let stops = [];
+
+  // ========= Map =========
+  const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12); // 滋賀付近（初期）
+  L.control.zoom({ position: "bottomright" }).addTo(map);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap"
+  }).addTo(map);
+
+  const markersLayer = L.layerGroup().addTo(map);
+
+  // current location marker
+  let currentMarker = null;
+  let currentLatLng = null;
+
+  // ========= Persistence =========
+  function load(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) stops = JSON.parse(raw) || [];
+    }catch(e){ stops = []; }
+  }
+  function save(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stops));
+  }
+
+  // ========= Geocoding (Nominatim) =========
+  // NOTE: Nominatim has usage policies; avoid heavy bursts.
+  async function geocodeAddress(address){
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("limit", "1");
+    url.searchParams.set("q", address);
+    url.searchParams.set("accept-language", "ja");
+
+    // Identify app (polite)
+    const res = await fetch(url.toString(), {
+      headers: {
+        "Accept": "application/json"
+      }
+    });
+    if(!res.ok) throw new Error("ジオコーディング失敗");
+    const data = await res.json();
+    if(!data || !data[0]) return null;
+    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), display: data[0].display_name };
+  }
+
+  // ========= Render =========
+  function updatePills(){
+    $("countPill").textContent = `件数：${stops.length}`;
+  }
+
+  function iconForStop(index, status){
+    // simple numbered label via DivIcon
+    const n = index + 1;
+    const bg = status === "done" ? "rgba(255,255,255,.18)" : "rgba(110,168,255,.28)";
+    const bd = status === "done" ? "rgba(255,255,255,.22)" : "rgba(110,168,255,.55)";
+    const color = "rgba(233,238,252,.95)";
+    return L.divIcon({
+      className: "",
+      html: `
+        <div style="
+          width:34px;height:34px;border-radius:999px;
+          display:grid;place-items:center;
+          background:${bg};
+          border:1px solid ${bd};
+          color:${color};
+          font-weight:900;
+          box-shadow:0 10px 30px rgba(0,0,0,.35);
+          backdrop-filter: blur(6px);
+        ">${n}</div>
+      `,
+      iconSize: [34,34],
+      iconAnchor: [17,34]
+    });
+  }
+
+  function redrawMarkers(){
+    markersLayer.clearLayers();
+
+    stops.forEach((s, i) => {
+      const m = L.marker([s.lat, s.lng], { icon: iconForStop(i, s.status) })
+        .addTo(markersLayer)
+        .bindPopup(`<b>${esc(s.name || "（名称なし）")}</b><br>${esc(s.address)}`);
+      // store marker ref if needed later
+      s._marker = m;
+    });
+  }
+
+  function renderList(){
+    const list = $("list");
+    list.innerHTML = "";
+
+    // Show pending first, then done (but keep numbering by overall order)
+    // If you prefer strict input order, remove sort and just loop stops.
+    const pending = stops.filter(s => s.status === "pending");
+    const done = stops.filter(s => s.status === "done");
+    const ordered = [...pending, ...done];
+
+    ordered.forEach((s) => {
+      const idx = stops.findIndex(x => x.id === s.id); // original index for marker number
+      const card = document.createElement("div");
+      card.className = "card" + (s.status === "done" ? " done" : "");
+      card.innerHTML = `
+        <div>
+          <div class="name"><span class="num">${idx+1}</span>${esc(s.name || "（名称なし）")}</div>
+          <div class="addr">${esc(s.address)}</div>
+        </div>
+        <div class="actions">
+          <button class="btn small primary" data-action="nav" data-id="${esc(s.id)}">▶ ナビ</button>
+          <button class="btn small good" data-action="done" data-id="${esc(s.id)}">✔ 完了</button>
+          <button class="btn small" data-action="focus" data-id="${esc(s.id)}">🗺 地図</button>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+
+    updatePills();
+  }
+
+  function focusStop(id){
+    const s = stops.find(x => x.id === id);
+    if(!s) return;
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 16), { animate:true });
+    if(s._marker) s._marker.openPopup();
+  }
+
+  function fitAll(){
+    if(stops.length === 0){
+      toast("配送先がありません");
+      return;
+    }
+    const latlngs = stops.map(s => [s.lat, s.lng]);
+    const bounds = L.latLngBounds(latlngs);
+    map.fitBounds(bounds.pad(0.22));
+  }
+
+  // ========= Actions =========
+  async function addStop(){
+    const name = $("name").value.trim();
+    const address = $("addr").value.trim();
+
+    if(!address){
+      toast("住所を入力してください");
+      $("addr").focus();
+      return;
+    }
+
+    $("addBtn").disabled = true;
+    $("addBtn").textContent = "…座標化中";
+
+    try{
+      const geo = await geocodeAddress(address);
+      if(!geo){
+        toast("住所が見つかりませんでした（表記を変えてみてください）");
+        return;
+      }
+
+      const id = crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2);
+
+      const stop = {
+        id,
+        name: name || "",
+        address,
+        lat: geo.lat,
+        lng: geo.lng,
+        status: "pending",
+        createdAt: Date.now()
+      };
+
+      stops.push(stop);
+      save();
+
+      redrawMarkers();
+      renderList();
+
+      // focus latest
+      map.setView([stop.lat, stop.lng], 16, { animate:true });
+
+      // clear inputs for next
+      $("name").value = "";
+      $("addr").value = "";
+      $("name").focus();
+
+      toast("追加しました");
+    }catch(e){
+      console.error(e);
+      toast("座標化に失敗しました（通信/住所表記を確認）");
+    }finally{
+      $("addBtn").disabled = false;
+      $("addBtn").textContent = "＋ 追加（住所→座標→ピン）";
+    }
+  }
+
+  function setDone(id){
+    const s = stops.find(x => x.id === id);
+    if(!s) return;
+    s.status = (s.status === "done") ? "pending" : "done";
+    save();
+    redrawMarkers();
+    renderList();
+  }
+
+  function openNav(id){
+    const s = stops.find(x => x.id === id);
+    if(!s) return;
+
+    // If current location known, provide navigation-friendly URL (Google Maps directions)
+    const base = new URL("https://www.google.com/maps/dir/");
+    if(currentLatLng){
+      base.pathname = `/maps/dir/${currentLatLng.lat},${currentLatLng.lng}/${s.lat},${s.lng}/`;
+    }else{
+      // fallback: just show destination
+      base.pathname = "/maps/search/";
+      base.searchParams.set("api", "1");
+      base.searchParams.set("query", `${s.lat},${s.lng}`);
+    }
+    window.open(base.toString(), "_blank");
+  }
+
+  function clearAll(){
+    if(!confirm("全ての配送先を消去します。よろしいですか？")) return;
+    stops = [];
+    save();
+    redrawMarkers();
+    renderList();
+    toast("全消去しました");
+  }
+
+  // ========= Geolocation =========
+  async function getLocation(){
+    if(!navigator.geolocation){
+      $("geoPill").textContent = "位置情報：非対応";
+      toast("位置情報が使えません");
+      return;
+    }
+    $("geoPill").textContent = "位置情報：取得中…";
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      currentLatLng = { lat, lng };
+      $("geoPill").textContent = "位置情報：OK";
+
+      if(currentMarker){
+        currentMarker.setLatLng([lat,lng]);
+      }else{
+        currentMarker = L.circleMarker([lat,lng], {
+          radius: 8,
+          weight: 2,
+          opacity: 1,
+          fillOpacity: .35
+        }).addTo(map).bindPopup("現在地");
+      }
+      map.setView([lat,lng], Math.max(map.getZoom(), 15), { animate:true });
+      toast("現在地を更新しました");
+    }, (err) => {
+      console.warn(err);
+      $("geoPill").textContent = "位置情報：NG";
+      toast("位置情報の取得に失敗（許可/電波を確認）");
+    }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 4000 });
+  }
+
+  // ========= Speech (Web Speech API) =========
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recog = null;
+
+  function initSpeech(){
+    if(!SpeechRecognition){
+      $("speechPill").textContent = "音声：非対応";
+      return;
+    }
+    $("speechPill").textContent = "音声：OK";
+    recog = new SpeechRecognition();
+    recog.lang = "ja-JP";
+    recog.interimResults = false;
+    recog.maxAlternatives = 1;
+  }
+
+  function speakToInput(inputEl){
+    if(!recog){
+      toast("音声入力が使えません（Chrome系推奨）");
+      return;
+    }
+    try{
+      recog.abort(); // reset
+    }catch(e){}
+
+    toast("話してください…");
+    recog.onresult = (ev) => {
+      const text = ev.results[0][0].transcript || "";
+      // append if already has text
+      const cur = inputEl.value.trim();
+      inputEl.value = cur ? (cur + " " + text) : text;
+      toast("入力しました");
+    };
+    recog.onerror = (ev) => {
+      console.warn(ev);
+      toast("音声入力に失敗（権限/HTTPSを確認）");
+    };
+    recog.onend = () => {};
+    recog.start();
+  }
+
+  // ========= Event bindings =========
+  $("addBtn").addEventListener("click", addStop);
+  $("clearBtn").addEventListener("click", clearAll);
+  $("fitBtn").addEventListener("click", fitAll);
+  $("locBtn").addEventListener("click", getLocation);
+
+  $("name").addEventListener("keydown", (e) => {
+    if(e.key === "Enter"){ $("addr").focus(); }
+  });
+  $("addr").addEventListener("keydown", (e) => {
+    if(e.key === "Enter"){ addStop(); }
+  });
+
+  $("micName").addEventListener("click", () => speakToInput($("name")));
+  $("micAddr").addEventListener("click", () => speakToInput($("addr")));
+
+  $("list").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if(!btn) return;
+    const id = btn.getAttribute("data-id");
+    const action = btn.getAttribute("data-action");
+    if(!id || !action) return;
+
+    if(action === "nav") openNav(id);
+    if(action === "done") setDone(id);
+    if(action === "focus") focusStop(id);
+  });
+
+  // ========= Boot =========
+  load();
+  initSpeech();
+  redrawMarkers();
+  renderList();
+
+  // first checks
+  if(SpeechRecognition) $("speechPill").textContent = "音声：OK";
+  else $("speechPill").textContent = "音声：非対応";
+
+  if(navigator.geolocation) $("geoPill").textContent = "位置情報：未取得";
+  else $("geoPill").textContent = "位置情報：非対応";
+
+  // Optional: auto get location once
+  // getLocation();
+
+})();
+</script>
+</body>
+</html>
