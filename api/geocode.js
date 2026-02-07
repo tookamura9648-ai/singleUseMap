@@ -1,7 +1,9 @@
 module.exports = async function (req, res) {
   try {
     const q = (req.query.q || "").toString().trim();
-    if (!q) return res.status(400).json({ ok: false, error: "q is required" });
+    if (!q) {
+      return res.status(400).json({ ok: false, error: "q is required" });
+    }
 
     const url = new URL("https://nominatim.openstreetmap.org/search");
     url.searchParams.set("format", "json");
@@ -13,18 +15,27 @@ module.exports = async function (req, res) {
     const r = await fetch(url.toString(), {
       headers: {
         "Accept": "application/json",
-        // Nominatimのマナー：本当は連絡先を入れるのがベター（後であなたのメール等に差し替えOK）
-        "User-Agent": "koguchi-delivery/1.0 (contact: example@example.com)"
+
+        // ★ここが最重要（あなたの連絡先を明示）
+        "User-Agent": "KoguchiDelivery/1.0 (contact: to.okamura9648@gmail.com)"
+        // ↑ 実在するメール or サイトURLに必ず変更してください
       }
     });
 
     if (!r.ok) {
       const body = await r.text().catch(() => "");
-      return res.status(502).json({ ok: false, error: "upstream error", status: r.status, body });
+      return res.status(502).json({
+        ok: false,
+        error: "upstream error",
+        status: r.status,
+        body
+      });
     }
 
     const data = await r.json();
-    if (!data || data.length === 0) return res.status(200).json({ ok: true, found: false });
+    if (!data || data.length === 0) {
+      return res.status(200).json({ ok: true, found: false });
+    }
 
     const first = data[0];
     return res.status(200).json({
@@ -35,7 +46,8 @@ module.exports = async function (req, res) {
       display: first.display_name
     });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: e?.message || "server error" });
+    return res.status(500).json({ ok: false, error: e.message });
   }
 };
+
 
