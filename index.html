@@ -288,15 +288,17 @@
   const url = new URL("/api/geocode", location.origin);
   url.searchParams.set("q", address);
 
-  const res = await fetch(url.toString(), { headers: { "Accept": "application/json" } });
+  const res = await fetch(url.toString(), {
+    headers: { "Accept": "application/json" }
+  });
   if(!res.ok) throw new Error("ジオコーディング失敗");
 
   const j = await res.json();
-  if(!j.ok) return null;
-  if(!j.found) return null;
+  if(!j.ok || !j.found) return null;
 
   return { lat: j.lat, lng: j.lng, display: j.display };
 }
+
 
 
 
