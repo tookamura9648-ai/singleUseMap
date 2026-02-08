@@ -519,7 +519,7 @@
       toast(`座標化に失敗しました。\n${e?.message || "通信/設定を確認"}`);
     }finally{
       $("addBtn").disabled = false;
-      $("addBtn").textContent = "＋ 追加（住所→座標→ピン）";
+      $("addBtn").textContent = "＋ 登録";
     }
   }
 
@@ -549,7 +549,7 @@
   }
 
   function clearAll(){
-    if(!confirm("全ての配送先を消去します。よろしいですか？")) return;
+    if(!confirm("全ての行先を消去します。よろしいですか？")) return;
     stops = [];
     save();
     redrawMarkers();
