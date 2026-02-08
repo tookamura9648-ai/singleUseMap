@@ -409,7 +409,7 @@
       const m = L.marker([s.lat, s.lng], { icon: iconForStop(i, s.status) })
         .addTo(markersLayer)
         .bindPopup(`<b>${esc(s.name || "（名称なし）")}</b><br>${esc(s.address)}`);
-      s._marker = m;
+      
     });
   }
 
@@ -443,11 +443,11 @@
   }
 
   function focusStop(id){
-    const s = stops.find(x => x.id === id);
-    if(!s) return;
-    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 16), { animate:true });
-    if(s._marker) s._marker.openPopup();
-  }
+  const s = stops.find(x => x.id === id);
+  if(!s) return;
+  map.setView([s.lat, s.lng], Math.max(map.getZoom(), 16), { animate:true });
+}
+
 
   function fitAll(){
     if(stops.length === 0){
