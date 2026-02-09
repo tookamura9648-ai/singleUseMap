@@ -420,17 +420,19 @@
     toast("調整モードに入りました");
   }
 
-  function cancelAdjust(){
-    adjustingId = null;
-    adjustLatLng = null;
+  function cancelAdjust(silent=false){
+  adjustingId = null;
+  adjustLatLng = null;
 
-    if(adjustMarker){
-      map.removeLayer(adjustMarker);
-      adjustMarker = null;
-    }
-    adjustBar.style.display = "none";
-    toast("キャンセルしました");
+  if(adjustMarker){
+    map.removeLayer(adjustMarker);
+    adjustMarker = null;
   }
+  adjustBar.style.display = "none";
+
+  if(!silent) toast("キャンセルしました");
+}
+
 
   function confirmAdjust(){
     if(!adjustingId || !adjustLatLng){
@@ -440,7 +442,7 @@
 
     const s = stops.find(x => x.id === adjustingId);
     if(!s){
-      cancelAdjust();
+      cancelAdjust(true);
       return;
     }
 
