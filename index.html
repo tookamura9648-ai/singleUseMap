@@ -176,27 +176,27 @@
       backdrop-filter: blur(8px);
       white-space: pre-wrap;
     }
-    .adjustBar{
-  position: fixed;
-  left: 12px; right: 12px; bottom: 12px;
-  z-index: 9998;
-  display:none;
-  gap:10px;
-  align-items:center;
-  justify-content:space-between;
-  padding:10px;
-  border-radius: calc(var(--r) + 6px);
-  border:1px solid var(--line);
-  background: rgba(18,26,51,.78);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 16px 50px rgba(0,0,0,.35);
-}
-.adjustBar .msg{
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.35;
-}
 
+    .adjustBar{
+      position: fixed;
+      left: 12px; right: 12px; bottom: 12px;
+      z-index: 9998;
+      display:none;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px;
+      border-radius: calc(var(--r) + 6px);
+      border:1px solid var(--line);
+      background: rgba(18,26,51,.78);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 16px 50px rgba(0,0,0,.35);
+    }
+    .adjustBar .msg{
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
   </style>
 </head>
 
@@ -249,7 +249,7 @@
       <div class="list" id="list"></div>
 
       <div class="hint">
-        ※「住所→座標」は Vercel の <b>/api/geocode</b> 経由です（OSM直叩きのブロック回避）。<br>
+        ※「住所→座標」は Vercel の <b>/api/geocode</b> 経由です。<br>
         ※住所が見つからない時は「県市から」「建物名・部屋番号を一旦外す」が強いです。<br>
         ※連続で大量追加する場合は、1秒くらい間隔を空けると安定します（このアプリでも連打防止しています）。
       </div>
@@ -257,14 +257,14 @@
   </main>
 
   <div class="toast" id="toast"></div>
-  <div class="adjustBar" id="adjustBar">
-  <div class="msg" id="adjustMsg">ピンをドラッグ（またはタップ/長押し）して位置を調整 → 確定</div>
-  <div class="row" style="gap:8px;">
-    <button class="btn small" id="cancelAdjustBtn">↩ キャンセル</button>
-    <button class="btn small good" id="confirmAdjustBtn">✅ 確定</button>
-  </div>
-</div>
 
+  <div class="adjustBar" id="adjustBar">
+    <div class="msg" id="adjustMsg">ピンをドラッグ（またはタップ/長押し）して位置を調整 → 確定</div>
+    <div class="row" style="gap:8px;">
+      <button class="btn small" id="cancelAdjustBtn">↩ キャンセル</button>
+      <button class="btn small good" id="confirmAdjustBtn">✅ 確定</button>
+    </div>
+  </div>
 
 <script>
 (() => {
@@ -283,131 +283,51 @@
   // ========= State =========
   const STORAGE_KEY = "koguchi_delivery_stops_v2";
   const GEO_CACHE_KEY = "koguchi_geo_cache_v1";
+  const PIN_MEMORY_KEY = "koguchi_pin_memory_v1"; // ★入口記憶（全消去しても残す）
+
   const ADD_COOLDOWN_MS = 900; // 連打防止
   let lastAddAt = 0;
 
-  /** @type {{id:string,name:string,address:string,lat:number,lng:number,status:"pending"|"done",createdAt:number,_marker?:any}[]} */
+  /** @type {{id:string,name:string,address:string,lat:number,lng:number,status:"pending"|"done",createdAt:number}[]} */
   let stops = [];
 
-  // ========= Map =========
-  const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12); // 滋賀付近
-  L.control.zoom({ position: "bottomright" }).addTo(map);
-
-  // タップで移動（好みでON）
-map.on("click", (e) => {
-  if(!adjustingId || !adjustMarker) return;
-  adjustMarker.setLatLng(e.latlng);
-  adjustLatLng = { lat: e.latlng.lat, lng: e.latlng.lng };
-});
-
-// 長押し（または右クリック）でも移動
-map.on("contextmenu", (e) => {
-  if(!adjustingId || !adjustMarker) return;
-  adjustMarker.setLatLng(e.latlng);
-  adjustLatLng = { lat: e.latlng.lat, lng: e.latlng.lng };
-});
-
-
-  // 表示地図：OpenStreetMap
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap"
-  }).addTo(map);
-
-  const markersLayer = L.layerGroup().addTo(map);
-
-  // current location marker
-  let currentMarker = null;
-  let currentLatLng = null;
-  let adjustingId = null;
-  let adjustMarker = null;
-  let adjustLatLng = null;
-
-  const adjustBar = $("adjustBar");
-  const adjustMsg = $("adjustMsg");
-
-  function startAdjust(id){
-  const s = stops.find(x => x.id === id);
-  if(!s) return;
-
-  adjustingId = id;
-  adjustLatLng = { lat: s.lat, lng: s.lng };
-
-  // 調整用マーカー（ドラッグ可）
-  if(adjustMarker){
-    map.removeLayer(adjustMarker);
-    adjustMarker = null;
+  // ========= Address normalization / retry =========
+  function normalizeAddress(a){
+    return (a || "")
+      .replace(/[‐-–—−]/g, "-")
+      .replace(/[ 　]+/g, " ")
+      .replace(/(〒\s*\d{3}-?\d{4})/g, "")      // 郵便番号削る
+      .replace(/(号室|室|階|F).*/g, "")        // 部屋/階以降ざっくり削る
+      .trim();
+  }
+  function stripBuilding(a){
+    return (a || "")
+      .replace(/(ビル|マンション|ハイツ|コーポ|アパート|タワー|メゾン|レジデンス|ハウス|コート).*/g, "")
+      .trim();
+  }
+  function memKey(address){
+    // “同じ住所”判定を安定させる（空白/ハイフン揺れ等を吸収）
+    return normalizeAddress(address).toLowerCase();
   }
 
-  adjustMarker = L.marker([s.lat, s.lng], { draggable: true })
-    .addTo(map)
-    .bindPopup("📍 調整中（ドラッグ / タップ / 長押し）")
-    .openPopup();
-
-  adjustMarker.on("dragend", () => {
-    const p = adjustMarker.getLatLng();
-    adjustLatLng = { lat: p.lat, lng: p.lng };
-  });
-
-  map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
-
-  adjustBar.style.display = "flex";
-  adjustMsg.textContent = "ピンをドラッグ（またはタップ/長押し）で移動 → ✅確定";
-  toast("調整モードに入りました");
-}
-
-function cancelAdjust(){
-  adjustingId = null;
-  adjustLatLng = null;
-
-  if(adjustMarker){
-    map.removeLayer(adjustMarker);
-    adjustMarker = null;
-  }
-  adjustBar.style.display = "none";
-  toast("キャンセルしました");
-}
-
-function confirmAdjust(){
-  if(!adjustingId || !adjustLatLng){
-    cancelAdjust();
-    return;
-  }
-
-  const s = stops.find(x => x.id === adjustingId);
-  if(!s){
-    cancelAdjust();
-    return;
-  }
-
-  // stopsの座標を更新して保存
-  s.lat = adjustLatLng.lat;
-  s.lng = adjustLatLng.lng;
-  save();
-
-  // 通常ピンを描き直し
-  redrawMarkers();
-  renderList();
-
-  map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
-  toast("確定しました ✅");
-
-  cancelAdjust();
-}
-
-  // ========= Persistence =========
-  function load(){
+  // ========= Pin memory =========
+  function loadPinMemory(address){
+    const k = memKey(address);
+    if(!k) return null;
     try{
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if(raw) stops = JSON.parse(raw) || [];
-    }catch(e){ stops = []; }
+      const mem = JSON.parse(localStorage.getItem(PIN_MEMORY_KEY) || "{}");
+      return mem[k] || null;
+    }catch(e){
+      return null;
+    }
   }
-  function save(){
-  const plain = stops.map(({ _marker, ...rest }) => rest);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(plain));
+  function savePinMemory(address, lat, lng){
+    const k = memKey(address);
+    if(!k) return;
+    const mem = JSON.parse(localStorage.getItem(PIN_MEMORY_KEY) || "{}");
+    mem[k] = { lat, lng, updatedAt: Date.now() };
+    localStorage.setItem(PIN_MEMORY_KEY, JSON.stringify(mem));
   }
-
-
 
   // ========= Geo cache =========
   function loadGeoCache(){
@@ -424,21 +344,121 @@ function confirmAdjust(){
     return (addr || "").toString().trim().toLowerCase();
   }
 
-  // ========= Address normalization / retry =========
-  function normalizeAddress(a){
-    return (a || "")
-      .replace(/[‐-–—−]/g, "-")
-      .replace(/[ 　]+/g, " ")
-      .replace(/(〒\s*\d{3}-?\d{4})/g, "")      // 郵便番号削る
-      .replace(/(号室|室|階|F).*/g, "")        // 部屋/階以降ざっくり削る
-      .trim();
+  // ========= Persistence =========
+  function load(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) stops = JSON.parse(raw) || [];
+    }catch(e){ stops = []; }
+  }
+  function save(){
+    // Leafletなどを混ぜない“素のデータ”だけ保存
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stops));
   }
 
-  // 建物名っぽい語以降を削る（当たり率上げ）
-  function stripBuilding(a){
-    return (a || "")
-      .replace(/(ビル|マンション|ハイツ|コーポ|アパート|タワー|メゾン|レジデンス|ハウス|コート).*/g, "")
-      .trim();
+  // ========= Map =========
+  const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12); // 滋賀付近
+  L.control.zoom({ position: "bottomright" }).addTo(map);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap"
+  }).addTo(map);
+
+  const markersLayer = L.layerGroup().addTo(map);
+
+  // current location marker
+  let currentMarker = null;
+  let currentLatLng = null;
+
+  // adjust mode
+  let adjustingId = null;
+  let adjustMarker = null;
+  let adjustLatLng = null;
+
+  const adjustBar = $("adjustBar");
+  const adjustMsg = $("adjustMsg");
+
+  // タップ/長押しで調整中ピン移動
+  map.on("click", (e) => {
+    if(!adjustingId || !adjustMarker) return;
+    adjustMarker.setLatLng(e.latlng);
+    adjustLatLng = { lat: e.latlng.lat, lng: e.latlng.lng };
+  });
+  map.on("contextmenu", (e) => {
+    if(!adjustingId || !adjustMarker) return;
+    adjustMarker.setLatLng(e.latlng);
+    adjustLatLng = { lat: e.latlng.lat, lng: e.latlng.lng };
+  });
+
+  function startAdjust(id){
+    const s = stops.find(x => x.id === id);
+    if(!s) return;
+
+    adjustingId = id;
+    adjustLatLng = { lat: s.lat, lng: s.lng };
+
+    if(adjustMarker){
+      map.removeLayer(adjustMarker);
+      adjustMarker = null;
+    }
+
+    adjustMarker = L.marker([s.lat, s.lng], { draggable: true })
+      .addTo(map)
+      .bindPopup("📍 調整中（ドラッグ / タップ / 長押し）")
+      .openPopup();
+
+    adjustMarker.on("dragend", () => {
+      const p = adjustMarker.getLatLng();
+      adjustLatLng = { lat: p.lat, lng: p.lng };
+    });
+
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
+
+    adjustBar.style.display = "flex";
+    adjustMsg.textContent = "ピンをドラッグ（またはタップ/長押し）で移動 → ✅確定";
+    toast("調整モードに入りました");
+  }
+
+  function cancelAdjust(){
+    adjustingId = null;
+    adjustLatLng = null;
+
+    if(adjustMarker){
+      map.removeLayer(adjustMarker);
+      adjustMarker = null;
+    }
+    adjustBar.style.display = "none";
+    toast("キャンセルしました");
+  }
+
+  function confirmAdjust(){
+    if(!adjustingId || !adjustLatLng){
+      cancelAdjust();
+      return;
+    }
+
+    const s = stops.find(x => x.id === adjustingId);
+    if(!s){
+      cancelAdjust();
+      return;
+    }
+
+    // 座標更新 → 保存
+    s.lat = adjustLatLng.lat;
+    s.lng = adjustLatLng.lng;
+    save();
+
+    // ★入口記憶に保存（同じ住所なら次回から自動でここ）
+    savePinMemory(s.address, s.lat, s.lng);
+
+    redrawMarkers();
+    renderList();
+
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
+    toast("確定しました ✅");
+
+    cancelAdjust();
   }
 
   // ========= Geocoding via Vercel API =========
@@ -448,8 +468,6 @@ function confirmAdjust(){
 
     const res = await fetch(url.toString(), { headers: { "Accept": "application/json" } });
     if(!res.ok){
-      let t = "";
-      try { t = await res.text(); } catch(e){}
       throw new Error(`APIエラー(${res.status})`);
     }
 
@@ -463,18 +481,15 @@ function confirmAdjust(){
   async function geocodeWithFallback(rawAddress){
     const cache = loadGeoCache();
 
-    // ① 正規化
     const a1 = normalizeAddress(rawAddress);
     if(a1){
       const k = cacheKey(a1);
       if(cache[k]) return cache[k];
     }
 
-    // ② まずは a1 で検索
     let geo = null;
     if(a1) geo = await geocodeAddress(a1);
 
-    // ③ ダメなら建物名除去して再試行
     if(!geo){
       const a2 = stripBuilding(a1);
       if(a2 && a2 !== a1){
@@ -484,7 +499,6 @@ function confirmAdjust(){
       }
     }
 
-    // ④ 成功したらキャッシュ
     if(geo){
       const k = cacheKey(a1);
       cache[k] = geo;
@@ -525,10 +539,9 @@ function confirmAdjust(){
   function redrawMarkers(){
     markersLayer.clearLayers();
     stops.forEach((s, i) => {
-      const m = L.marker([s.lat, s.lng], { icon: iconForStop(i, s.status) })
+      L.marker([s.lat, s.lng], { icon: iconForStop(i, s.status) })
         .addTo(markersLayer)
         .bindPopup(`<b>${esc(s.name || "（名称なし）")}</b><br>${esc(s.address)}`);
-      
     });
   }
 
@@ -563,15 +576,14 @@ function confirmAdjust(){
   }
 
   function focusStop(id){
-  const s = stops.find(x => x.id === id);
-  if(!s) return;
-  map.setView([s.lat, s.lng], Math.max(map.getZoom(), 16), { animate:true });
-}
-
+    const s = stops.find(x => x.id === id);
+    if(!s) return;
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 16), { animate:true });
+  }
 
   function fitAll(){
     if(stops.length === 0){
-      toast("配送先がありません");
+      toast("目的地がありません");
       return;
     }
     const latlngs = stops.map(s => [s.lat, s.lng]);
@@ -600,12 +612,24 @@ function confirmAdjust(){
     $("addBtn").textContent = "…座標化中";
 
     try{
-      // API経由＋正規化＋再試行＋キャッシュ
-      const geo = await geocodeWithFallback(addressRaw);
+      // ★ まず入口記憶を優先（同じ住所なら自動で調整済み座標）
+      const remembered = loadPinMemory(addressRaw);
 
-      if(!geo){
-        toast("住所が見つかりませんでした。\n・県市から入れる\n・建物名/部屋番号を外す\nを試してください");
-        return;
+      let lat, lng;
+
+      if(remembered){
+        lat = Number(remembered.lat);
+        lng = Number(remembered.lng);
+        toast("保存済みの入口位置を使用しました");
+      }else{
+        // 通常ジオコーディング
+        const geo = await geocodeWithFallback(addressRaw);
+        if(!geo){
+          toast("住所が見つかりませんでした。\n・県市から入れる\n・建物名/部屋番号を外す\nを試してください");
+          return;
+        }
+        lat = geo.lat;
+        lng = geo.lng;
       }
 
       const id = crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2);
@@ -613,10 +637,9 @@ function confirmAdjust(){
       const stop = {
         id,
         name: name || "",
-        // 画面表示は「入力した住所」を優先（displayは揺れるので使わない）
         address: addressRaw,
-        lat: geo.lat,
-        lng: geo.lng,
+        lat,
+        lng,
         status: "pending",
         createdAt: Date.now()
       };
@@ -633,7 +656,7 @@ function confirmAdjust(){
       $("addr").value = "";
       $("name").focus();
 
-      toast("追加しました");
+      if(!remembered) toast("追加しました");
     }catch(e){
       console.error(e);
       toast(`座標化に失敗しました。\n${e?.message || "通信/設定を確認"}`);
@@ -656,7 +679,6 @@ function confirmAdjust(){
     const s = stops.find(x => x.id === id);
     if(!s) return;
 
-    // Google Maps を外部起動
     const base = new URL("https://www.google.com/maps/dir/");
     if(currentLatLng){
       base.pathname = `/maps/dir/${currentLatLng.lat},${currentLatLng.lng}/${s.lat},${s.lng}/`;
@@ -674,7 +696,7 @@ function confirmAdjust(){
     save();
     redrawMarkers();
     renderList();
-    toast("全消去しました");
+    toast("全消去しました（入口記憶は残ります）");
   }
 
   // ========= Geolocation =========
@@ -765,7 +787,6 @@ function confirmAdjust(){
   $("cancelAdjustBtn").addEventListener("click", cancelAdjust);
   $("confirmAdjustBtn").addEventListener("click", confirmAdjust);
 
-
   $("name").addEventListener("keydown", (e) => {
     if(e.key === "Enter"){ $("addr").focus(); }
   });
@@ -787,7 +808,6 @@ function confirmAdjust(){
     if(action === "done") setDone(id);
     if(action === "focus") focusStop(id);
     if(action === "adjust") startAdjust(id);
-
   });
 
   // ========= Boot =========
@@ -803,9 +823,9 @@ function confirmAdjust(){
   else $("geoPill").textContent = "位置情報：非対応";
 
   apiCheck();
-  showSplashIfNeeded();
 
 })();
 </script>
 </body>
 </html>
+
