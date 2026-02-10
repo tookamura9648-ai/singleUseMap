@@ -280,6 +280,36 @@
   }
   function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
+  function applyQueryToInputs(){
+  try{
+    const u = new URL(location.href);
+
+    // name / addr の両対応（addr または address でもOKにしておく）
+    const qName = u.searchParams.get("name") || "";
+    const qAddr = u.searchParams.get("addr") || u.searchParams.get("address") || "";
+
+    // 何も無ければ何もしない
+    if(!qName && !qAddr) return;
+
+    // 入力欄にセット（手打ち/音声と共存）
+    if(qName) $("name").value = qName;
+    if(qAddr) $("addr").value = qAddr;
+
+    toast("QRから入力しました（登録を押してください）");
+
+    // ★同じURLでリロードしても毎回反映されないよう、URLのクエリを消す
+    // （履歴を汚さない replaceState）
+    u.search = "";
+    history.replaceState({}, "", u.toString());
+
+    // 住所欄にカーソル（必要に応じて変更OK）
+    $("addr").focus();
+  }catch(e){
+    console.warn("applyQueryToInputs failed", e);
+  }
+}
+
+
   // ========= State =========
   const STORAGE_KEY = "koguchi_delivery_stops_v2";
   const GEO_CACHE_KEY = "koguchi_geo_cache_v1";
@@ -825,6 +855,8 @@
   else $("geoPill").textContent = "位置情報：非対応";
 
   apiCheck();
+  applyQueryToInputs();
+
 
 })();
 </script>
