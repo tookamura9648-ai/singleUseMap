@@ -203,13 +203,18 @@
 <body>
   <header>
     <div class="title">個別Navigation</div>
+    
 
     <div class="inputGrid">
       <div class="field">
         <button class="btn icon" id="micName" title="音声入力（配送先名）">🎤</button>
         <input id="name" type="text" placeholder="名前" autocomplete="off">
       </div>
-
+      <div class="field">
+        <input id="zip" type="tel" inputmode="numeric" pattern="[0-9\-]*"
+             placeholder="郵便番号（例：5200806）" autocomplete="postal-code">
+        <button class="btn small" id="zipBtn">〒 住所補完</button>
+      </div>
       <div class="field">
         <button class="btn icon" id="micAddr" title="音声入力（住所）">🎤</button>
         <input id="addr" type="text" placeholder="住所" autocomplete="off">
@@ -494,6 +499,27 @@
   }
 
   // ========= Geocoding via Vercel API =========
+    async function fetchAddressByZip(zipRaw){
+      // 数字だけにする
+      const zip = (zipRaw || "").replace(/[^\d]/g, "");
+      if(zip.length !== 7){
+        throw new Error("郵便番号は7桁で入力してください");
+      }
+    
+      const url = `https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zip}`;
+      const res = await fetch(url);
+      const j = await res.json();
+    
+      if(j.status !== 200 || !j.results || !j.results[0]){
+        throw new Error("郵便番号から住所が見つかりません");
+      }
+    
+      const r = j.results[0];
+      // 都道府県＋市区町村＋町域
+      return `${r.address1}${r.address2}${r.address3}`;
+    }
+
+  
   async function geocodeAddress(address){
     const url = new URL("/api/geocode", location.origin);
     url.searchParams.set("q", address);
@@ -841,6 +867,33 @@
     if(action === "focus") focusStop(id);
     if(action === "adjust") startAdjust(id);
   });
+
+  $("zipBtn").addEventListener("click", async () => {
+  const zip = $("zip").value.trim();
+  if(!zip){
+    toast("郵便番号を入力してください");
+    $("zip").focus();
+    return;
+  }
+
+  $("zipBtn").disabled = true;
+
+  try{
+    const addr = await fetchAddressByZip(zip);
+
+    // 既に住所があれば後ろに追加、無ければセット
+    const cur = $("addr").value.trim();
+    $("addr").value = cur ? (addr + " " + cur) : addr;
+
+    toast("住所を補完しました。番地を入力してください");
+    $("addr").focus();
+  }catch(e){
+    toast(e.message || "郵便番号検索に失敗しました");
+  }finally{
+    $("zipBtn").disabled = false;
+  }
+});
+
 
   // ========= Boot =========
   load();
