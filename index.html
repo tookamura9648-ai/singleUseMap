@@ -203,18 +203,20 @@
 <body>
   <header>
     <div class="title">個別Navigation</div>
-    
 
     <div class="inputGrid">
+      <!-- 郵便番号 → 住所補完（数字キー運用向け） -->
+      <div class="field">
+        <input id="zip" type="tel" inputmode="numeric" pattern="[0-9\-]*"
+               placeholder="郵便番号（例：5200806）" autocomplete="postal-code">
+        <button class="btn small" id="zipBtn">〒 住所補完</button>
+      </div>
+
       <div class="field">
         <button class="btn icon" id="micName" title="音声入力（配送先名）">🎤</button>
         <input id="name" type="text" placeholder="名前" autocomplete="off">
       </div>
-      <div class="field">
-        <input id="zip" type="tel" inputmode="numeric" pattern="[0-9\-]*"
-             placeholder="郵便番号（例：5200806）" autocomplete="postal-code">
-        <button class="btn small" id="zipBtn">〒 住所補完</button>
-      </div>
+
       <div class="field">
         <button class="btn icon" id="micAddr" title="音声入力（住所）">🎤</button>
         <input id="addr" type="text" placeholder="住所" autocomplete="off">
@@ -246,17 +248,20 @@
       <div class="listHeader">
         <div>
           <div style="font-weight:900;">目的地リスト</div>
-          <div class="meta">20件以上OK（完了で下がる / 地図は最後に追加した地点を自動フォーカス）</div>
+          <div class="meta">20件以上OK（完了で下がる / ピン番号も更新）</div>
         </div>
-        <button class="btn small" id="fitBtn">🧭 全体表示</button>
+        <div class="row">
+          <button class="btn small" id="optBtn">✨ 近い順</button>
+          <button class="btn small" id="fitBtn">🧭 全体表示</button>
+        </div>
       </div>
 
       <div class="list" id="list"></div>
 
       <div class="hint">
         ※「住所→座標」は Vercel の <b>/api/geocode</b> 経由です。<br>
-        ※住所が見つからない時は「県市から」「建物名・部屋番号を一旦外す」が強いです。<br>
-        ※連続で大量追加する場合は、1秒くらい間隔を空けると安定します（このアプリでも連打防止しています）。
+        ※市街地は代表点ズレが出る場合があります。必要に応じて <b>📍調整</b> を使ってください。<br>
+        ※「✨ 近い順」は <b>現在地</b> が取れていれば現在地から、無ければ先頭の目的地から並べ替えます。
       </div>
     </section>
   </main>
@@ -285,40 +290,10 @@
   }
   function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-  function applyQueryToInputs(){
-  try{
-    const u = new URL(location.href);
-
-    // name / addr の両対応（addr または address でもOKにしておく）
-    const qName = u.searchParams.get("name") || "";
-    const qAddr = u.searchParams.get("addr") || u.searchParams.get("address") || "";
-
-    // 何も無ければ何もしない
-    if(!qName && !qAddr) return;
-
-    // 入力欄にセット（手打ち/音声と共存）
-    if(qName) $("name").value = qName;
-    if(qAddr) $("addr").value = qAddr;
-
-    toast("QRから入力しました（登録を押してください）");
-
-    // ★同じURLでリロードしても毎回反映されないよう、URLのクエリを消す
-    // （履歴を汚さない replaceState）
-    u.search = "";
-    history.replaceState({}, "", u.toString());
-
-    // 住所欄にカーソル（必要に応じて変更OK）
-    $("addr").focus();
-  }catch(e){
-    console.warn("applyQueryToInputs failed", e);
-  }
-}
-
-
   // ========= State =========
-  const STORAGE_KEY = "koguchi_delivery_stops_v2";
+  const STORAGE_KEY = "koguchi_delivery_stops_v3";
   const GEO_CACHE_KEY = "koguchi_geo_cache_v1";
-  const PIN_MEMORY_KEY = "koguchi_pin_memory_v1"; // ★入口記憶（全消去しても残す）
+  const PIN_MEMORY_KEY = "koguchi_pin_memory_v1"; // 入口記憶（全消去しても残す）
 
   const ADD_COOLDOWN_MS = 900; // 連打防止
   let lastAddAt = 0;
@@ -326,13 +301,13 @@
   /** @type {{id:string,name:string,address:string,lat:number,lng:number,status:"pending"|"done",createdAt:number}[]} */
   let stops = [];
 
-  // ========= Address normalization / retry =========
+  // ========= Address normalization =========
   function normalizeAddress(a){
     return (a || "")
       .replace(/[‐-–—−]/g, "-")
       .replace(/[ 　]+/g, " ")
-      .replace(/(〒\s*\d{3}-?\d{4})/g, "")      // 郵便番号削る
-      .replace(/(号室|室|階|F).*/g, "")        // 部屋/階以降ざっくり削る
+      .replace(/(〒\s*\d{3}-?\d{4})/g, "")
+      .replace(/(号室|室|階|F).*/g, "")
       .trim();
   }
   function stripBuilding(a){
@@ -341,7 +316,6 @@
       .trim();
   }
   function memKey(address){
-    // “同じ住所”判定を安定させる（空白/ハイフン揺れ等を吸収）
     return normalizeAddress(address).toLowerCase();
   }
 
@@ -387,12 +361,11 @@
     }catch(e){ stops = []; }
   }
   function save(){
-    // Leafletなどを混ぜない“素のデータ”だけ保存
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stops));
   }
 
   // ========= Map =========
-  const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12); // 滋賀付近
+  const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12);
   L.control.zoom({ position: "bottomright" }).addTo(map);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -402,7 +375,7 @@
 
   const markersLayer = L.layerGroup().addTo(map);
 
-  // current location marker
+  // current location
   let currentMarker = null;
   let currentLatLng = null;
 
@@ -456,18 +429,17 @@
   }
 
   function cancelAdjust(silent=false){
-  adjustingId = null;
-  adjustLatLng = null;
+    adjustingId = null;
+    adjustLatLng = null;
 
-  if(adjustMarker){
-    map.removeLayer(adjustMarker);
-    adjustMarker = null;
+    if(adjustMarker){
+      map.removeLayer(adjustMarker);
+      adjustMarker = null;
+    }
+    adjustBar.style.display = "none";
+
+    if(!silent) toast("キャンセルしました");
   }
-  adjustBar.style.display = "none";
-
-  if(!silent) toast("キャンセルしました");
-}
-
 
   function confirmAdjust(){
     if(!adjustingId || !adjustLatLng){
@@ -477,7 +449,7 @@
 
     const s = stops.find(x => x.id === adjustingId);
     if(!s){
-      cancelAdjust(true);
+      cancelAdjust();
       return;
     }
 
@@ -486,7 +458,7 @@
     s.lng = adjustLatLng.lng;
     save();
 
-    // ★入口記憶に保存（同じ住所なら次回から自動でここ）
+    // 入口記憶に保存（同じ住所なら次回から自動）
     savePinMemory(s.address, s.lat, s.lng);
 
     redrawMarkers();
@@ -495,31 +467,47 @@
     map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
     toast("確定しました ✅");
 
-    cancelAdjust();
+    cancelAdjust(true);
+  }
+
+  // ========= QR(URLパラメータ) → 入力欄 =========
+  function applyQueryToInputs(){
+    try{
+      const u = new URL(location.href);
+      const qName = u.searchParams.get("name") || "";
+      const qAddr = u.searchParams.get("addr") || u.searchParams.get("address") || "";
+      if(!qName && !qAddr) return;
+
+      if(qName) $("name").value = qName;
+      if(qAddr) $("addr").value = qAddr;
+
+      toast("QRから入力しました（登録を押してください）");
+
+      u.search = "";
+      history.replaceState({}, "", u.toString());
+      $("addr").focus();
+    }catch(e){
+      console.warn("applyQueryToInputs failed", e);
+    }
+  }
+
+  // ========= 郵便番号 → 住所補完（ZipCloud） =========
+  async function fetchAddressByZip(zipRaw){
+    const zip = (zipRaw || "").replace(/[^\d]/g, "");
+    if(zip.length !== 7){
+      throw new Error("郵便番号は7桁で入力してください");
+    }
+    const url = `https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zip}`;
+    const res = await fetch(url);
+    const j = await res.json();
+    if(j.status !== 200 || !j.results || !j.results[0]){
+      throw new Error("郵便番号から住所が見つかりません");
+    }
+    const r = j.results[0];
+    return `${r.address1}${r.address2}${r.address3}`;
   }
 
   // ========= Geocoding via Vercel API =========
-    async function fetchAddressByZip(zipRaw){
-      // 数字だけにする
-      const zip = (zipRaw || "").replace(/[^\d]/g, "");
-      if(zip.length !== 7){
-        throw new Error("郵便番号は7桁で入力してください");
-      }
-    
-      const url = `https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zip}`;
-      const res = await fetch(url);
-      const j = await res.json();
-    
-      if(j.status !== 200 || !j.results || !j.results[0]){
-        throw new Error("郵便番号から住所が見つかりません");
-      }
-    
-      const r = j.results[0];
-      // 都道府県＋市区町村＋町域
-      return `${r.address1}${r.address2}${r.address3}`;
-    }
-
-  
   async function geocodeAddress(address){
     const url = new URL("/api/geocode", location.origin);
     url.searchParams.set("q", address);
@@ -648,6 +636,55 @@
     map.fitBounds(L.latLngBounds(latlngs).pad(0.22));
   }
 
+  // ========= Route optimization (A: current location start) =========
+  function dist2(a, b){
+    const dx = a.lat - b.lat;
+    const dy = a.lng - b.lng;
+    return dx*dx + dy*dy; // 高速な近似でOK（並べ替え用途）
+  }
+
+  function optimizeOrder(){
+    const pending = stops.filter(s => s.status === "pending");
+    const done = stops.filter(s => s.status === "done");
+
+    if(pending.length <= 2){
+      toast("最適化する件数が少ないです");
+      return;
+    }
+
+    // A: 現在地があれば現在地、なければ pending先頭
+    const start = currentLatLng
+      ? { lat: currentLatLng.lat, lng: currentLatLng.lng }
+      : { lat: pending[0].lat, lng: pending[0].lng };
+
+    // 最近傍法（Nearest Neighbor）
+    const remaining = pending.slice();
+    const ordered = [];
+    let cur = start;
+
+    while(remaining.length){
+      let bestIdx = 0;
+      let bestD = Infinity;
+      for(let i=0;i<remaining.length;i++){
+        const d = dist2(cur, remaining[i]);
+        if(d < bestD){
+          bestD = d;
+          bestIdx = i;
+        }
+      }
+      const next = remaining.splice(bestIdx, 1)[0];
+      ordered.push(next);
+      cur = { lat: next.lat, lng: next.lng };
+    }
+
+    stops = [...ordered, ...done];
+    save();
+    redrawMarkers();
+    renderList();
+
+    toast(currentLatLng ? "現在地から近い順に並べ替えました" : "近い順に並べ替えました");
+  }
+
   // ========= Actions =========
   async function addStop(){
     const now = Date.now();
@@ -670,7 +707,7 @@
     $("addBtn").textContent = "…座標化中";
 
     try{
-      // ★ まず入口記憶を優先（同じ住所なら自動で調整済み座標）
+      // 入口記憶があれば優先
       const remembered = loadPinMemory(addressRaw);
 
       let lat, lng;
@@ -680,7 +717,6 @@
         lng = Number(remembered.lng);
         toast("保存済みの入口位置を使用しました");
       }else{
-        // 通常ジオコーディング
         const geo = await geocodeWithFallback(addressRaw);
         if(!geo){
           toast("住所が見つかりませんでした。\n・県市から入れる\n・建物名/部屋番号を外す\nを試してください");
@@ -712,6 +748,7 @@
 
       $("name").value = "";
       $("addr").value = "";
+      $("zip").value = "";
       $("name").focus();
 
       if(!remembered) toast("追加しました");
@@ -841,8 +878,10 @@
   $("addBtn").addEventListener("click", addStop);
   $("clearBtn").addEventListener("click", clearAll);
   $("fitBtn").addEventListener("click", fitAll);
+  $("optBtn").addEventListener("click", optimizeOrder);
   $("locBtn").addEventListener("click", getLocation);
-  $("cancelAdjustBtn").addEventListener("click", cancelAdjust);
+
+  $("cancelAdjustBtn").addEventListener("click", () => cancelAdjust(false));
   $("confirmAdjustBtn").addEventListener("click", confirmAdjust);
 
   $("name").addEventListener("keydown", (e) => {
@@ -850,6 +889,32 @@
   });
   $("addr").addEventListener("keydown", (e) => {
     if(e.key === "Enter"){ addStop(); }
+  });
+
+  // 郵便番号：Enterで補完
+  $("zip").addEventListener("keydown", (e) => {
+    if(e.key === "Enter"){ $("zipBtn").click(); }
+  });
+
+  $("zipBtn").addEventListener("click", async () => {
+    const zip = $("zip").value.trim();
+    if(!zip){
+      toast("郵便番号を入力してください");
+      $("zip").focus();
+      return;
+    }
+    $("zipBtn").disabled = true;
+    try{
+      const addr = await fetchAddressByZip(zip);
+      const cur = $("addr").value.trim();
+      $("addr").value = cur ? (addr + " " + cur) : addr;
+      toast("住所を補完しました。番地を入力してください");
+      $("addr").focus();
+    }catch(e){
+      toast(e.message || "郵便番号検索に失敗しました");
+    }finally{
+      $("zipBtn").disabled = false;
+    }
   });
 
   $("micName").addEventListener("click", () => speakToInput($("name")));
@@ -868,33 +933,6 @@
     if(action === "adjust") startAdjust(id);
   });
 
-  $("zipBtn").addEventListener("click", async () => {
-  const zip = $("zip").value.trim();
-  if(!zip){
-    toast("郵便番号を入力してください");
-    $("zip").focus();
-    return;
-  }
-
-  $("zipBtn").disabled = true;
-
-  try{
-    const addr = await fetchAddressByZip(zip);
-
-    // 既に住所があれば後ろに追加、無ければセット
-    const cur = $("addr").value.trim();
-    $("addr").value = cur ? (addr + " " + cur) : addr;
-
-    toast("住所を補完しました。番地を入力してください");
-    $("addr").focus();
-  }catch(e){
-    toast(e.message || "郵便番号検索に失敗しました");
-  }finally{
-    $("zipBtn").disabled = false;
-  }
-});
-
-
   // ========= Boot =========
   load();
   initSpeech();
@@ -910,9 +948,7 @@
   apiCheck();
   applyQueryToInputs();
 
-
 })();
 </script>
 </body>
 </html>
-
