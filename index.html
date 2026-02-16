@@ -1,44 +1,1229 @@
-const CACHE_NAME = "koguchi-pwa-v1";
-const CORE_ASSETS = [
-  "/", "/index.html", "/manifest.json",
-  "/icon-192.png", "/icon-512.png"
-];
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>個別Navigation</title>
 
-// インストール：アプリ本体をキャッシュ
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(CORE_ASSETS))
-  );
-  self.skipWaiting();
-});
+  <!-- PWA (manifest) -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0b1020">
 
-// 有効化：古いキャッシュ掃除
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.map(k => (k === CACHE_NAME ? null : caches.delete(k))))
-    )
-  );
-  self.clients.claim();
-});
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-// fetch：基本はネット優先、失敗時にキャッシュ
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#121a33;
+      --panel2:#0f1730;
+      --text:#e9eefc;
+      --muted:#a8b2d6;
+      --line:rgba(255,255,255,.10);
+      --accent:#6ea8ff;
+      --good:#48d597;
+      --danger:#ff6b6b;
+      --warn:#ffcc66;
+      --r:16px;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      background: radial-gradient(1200px 700px at 10% 0%, rgba(110,168,255,.22), transparent 60%),
+                  radial-gradient(900px 600px at 90% 0%, rgba(72,213,151,.18), transparent 55%),
+                  var(--bg);
+      color:var(--text);
+    }
+    header{
+      position:sticky; top:0; z-index:50;
+      padding:10px 12px 12px;
+      background: linear-gradient(to bottom, rgba(11,16,32,.95), rgba(11,16,32,.70));
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--line);
+    }
+    .row{ display:flex; gap:10px; align-items:center; }
+    .title{ font-weight:800; letter-spacing:.03em; font-size:16px; margin:0 0 8px; opacity:.95; }
+    .inputGrid{ display:grid; grid-template-columns: 1fr; gap:8px; }
+    .field{
+      display:flex; gap:8px; align-items:center;
+      padding:10px;
+      background: rgba(18,26,51,.85);
+      border:1px solid var(--line);
+      border-radius: var(--r);
+    }
+    .field input{
+      width:100%;
+      border:0; outline:none;
+      background: transparent;
+      color: var(--text);
+      font-size:16px;
+    }
+    .field input::placeholder{ color: rgba(233,238,252,.45); }
 
-  // GETのみ
-  if(req.method !== "GET") return;
+    .btn{
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius: 999px;
+      font-weight:700;
+      font-size:14px;
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color: transparent;
+      display:inline-flex; gap:8px; align-items:center; justify-content:center;
+      white-space:nowrap;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn.primary{ background: rgba(110,168,255,.18); border-color: rgba(110,168,255,.35); }
+    .btn.good{ background: rgba(72,213,151,.16); border-color: rgba(72,213,151,.35); }
+    .btn.danger{ background: rgba(255,107,107,.12); border-color: rgba(255,107,107,.3); }
+    .btn.warn{ background: rgba(255,204,102,.12); border-color: rgba(255,204,102,.3); }
+    .btn.small{ padding:8px 10px; font-size:13px; }
+    .btn.icon{ width:42px; padding:10px 0; }
+    .btn:disabled{ opacity:.55; cursor:not-allowed; }
 
-  event.respondWith(
-    fetch(req).then((res) => {
-      // 成功したらキャッシュにも入れる（地図タイルも“見た範囲”が残りやすい）
-      const copy = res.clone();
-      caches.open(CACHE_NAME).then(cache => cache.put(req, copy)).catch(()=>{});
-      return res;
-    }).catch(async () => {
-      const cached = await caches.match(req);
-      return cached || Response.error();
-    })
-  );
-});
+    .status{
+      margin-top:8px;
+      font-size:12px;
+      color: var(--muted);
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .pill{
+      padding:6px 10px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      background: rgba(255,255,255,.05);
+    }
+    .pill.warn{
+      border-color: rgba(255,204,102,.35);
+      background: rgba(255,204,102,.10);
+      color: rgba(255,235,190,.95);
+    }
+
+    #mapWrap{ padding:12px; }
+    #map{
+      height: 46vh;
+      min-height: 320px;
+      border-radius: calc(var(--r) + 6px);
+      border:1px solid var(--line);
+      overflow:hidden;
+      box-shadow: 0 16px 50px rgba(0,0,0,.35);
+    }
+
+    main{ padding-bottom: 18px; }
+    .panel{
+      margin: 0 12px 12px;
+      padding: 12px;
+      border-radius: calc(var(--r) + 6px);
+      border:1px solid var(--line);
+      background: rgba(18,26,51,.60);
+      backdrop-filter: blur(8px);
+    }
+    .listHeader{
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      margin-bottom: 10px;
+    }
+    .listHeader .meta{ color:var(--muted); font-size:12px; }
+    .list{
+      display:flex; flex-direction:column; gap:10px;
+      max-height: 38vh;
+      overflow:auto;
+      padding-right: 4px;
+    }
+    .card{
+      border:1px solid var(--line);
+      background: rgba(15,23,48,.68);
+      border-radius: var(--r);
+      padding: 10px;
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+    .card.done{ opacity:.55; filter:saturate(.7); }
+    .num{ font-weight:900; color: rgba(233,238,252,.9); margin-right:8px; }
+    .name{ font-weight:800; font-size:15px; }
+    .addr{ color: var(--muted); font-size:12.5px; margin-top:2px; line-height:1.35; }
+    .actions{ display:flex; flex-direction:column; gap:8px; justify-content:center; }
+    .hint{
+      color: rgba(233,238,252,.55);
+      font-size:12px;
+      margin-top:10px;
+      line-height:1.45;
+    }
+
+    .toast{
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 14px;
+      z-index: 9999;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.65);
+      border: 1px solid rgba(255,255,255,.12);
+      color: var(--text);
+      font-size: 13px;
+      display:none;
+      max-width: min(92vw, 540px);
+      text-align:center;
+      backdrop-filter: blur(8px);
+      white-space: pre-wrap;
+    }
+
+    .adjustBar{
+      position: fixed;
+      left: 12px; right: 12px; bottom: 12px;
+      z-index: 9998;
+      display:none;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px;
+      border-radius: calc(var(--r) + 6px);
+      border:1px solid var(--line);
+      background: rgba(18,26,51,.78);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 16px 50px rgba(0,0,0,.35);
+    }
+    .adjustBar .msg{
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="title">個別Navigation</div>
+
+    <div class="inputGrid">
+      <!-- 郵便番号 → 住所補完 -->
+      <div class="field">
+        <input id="zip" type="tel" inputmode="numeric" pattern="[0-9\-]*"
+               placeholder="郵便番号（例：5200806）" autocomplete="postal-code">
+        <button class="btn small" id="zipBtn">〒 住所補完</button>
+      </div>
+
+      <div class="field">
+        <button class="btn icon" id="micName" title="音声入力（名称）">🎤</button>
+        <input id="name" type="text" placeholder="名前" autocomplete="off">
+      </div>
+
+      <div class="field">
+        <button class="btn icon" id="micAddr" title="音声入力（住所）">🎤</button>
+        <input id="addr" type="text" placeholder="住所" autocomplete="off">
+      </div>
+
+      <div class="row" style="justify-content:space-between;">
+        <button class="btn primary" id="addBtn">＋ 登録</button>
+        <div class="row">
+          <button class="btn small" id="locBtn">📍 現在地</button>
+          <button class="btn small danger" id="clearBtn">🗑 全消去</button>
+        </div>
+      </div>
+
+      <div class="status">
+        <div class="pill" id="countPill">件数：0</div>
+        <div class="pill" id="speechPill">音声：未確認</div>
+        <div class="pill" id="geoPill">位置情報：未確認</div>
+        <div class="pill" id="netPill">API：未確認</div>
+        <div class="pill" id="gpsPill">GPS：未監視</div>
+        <div class="pill" id="hdgPill">方位：—</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="mapWrap">
+      <div id="map"></div>
+    </div>
+
+    <section class="panel">
+      <div class="listHeader">
+        <div>
+          <div style="font-weight:900;">目的地リスト</div>
+          <div class="meta">未完了ルート線 / ✨近い順（現在地起点）</div>
+        </div>
+        <div class="row">
+          <button class="btn small" id="optBtn">✨ 近い順</button>
+          <button class="btn small" id="fitBtn">🧭 全体表示</button>
+        </div>
+      </div>
+
+      <div class="list" id="list"></div>
+
+      <div class="hint">
+        ※ 住所→座標は <b>/api/geocode</b>（Vercel経由）です。<br>
+        ※ 市街地のズレは <b>📍調整→✅確定</b> で入口を記憶できます。<br>
+        ※ トンネル等でGPSが止まったら <b>GPS：ロスト</b> が出ます（短時間は推測位置を表示）。
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="adjustBar" id="adjustBar">
+    <div class="msg" id="adjustMsg">ピンをドラッグ（またはタップ/長押し）で位置を調整 → 確定</div>
+    <div class="row" style="gap:8px;">
+      <button class="btn small" id="cancelAdjustBtn">↩ キャンセル</button>
+      <button class="btn small good" id="confirmAdjustBtn">✅ 確定</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ========= Utilities =========
+  const $ = (id) => document.getElementById(id);
+  const toastEl = $("toast");
+  let toastTimer = null;
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.style.display = "block";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.style.display = "none", 2600);
+  }
+  function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  // ========= State =========
+  const STORAGE_KEY = "koguchi_delivery_stops_v4";
+  const GEO_CACHE_KEY = "koguchi_geo_cache_v1";
+  const PIN_MEMORY_KEY = "koguchi_pin_memory_v1";
+
+  const ADD_COOLDOWN_MS = 900;
+  let lastAddAt = 0;
+
+  /** @type {{id:string,name:string,address:string,lat:number,lng:number,status:"pending"|"done",createdAt:number}[]} */
+  let stops = [];
+
+  // route visuals
+  let routeLine = null;      // 未完了ルート線（直線）
+  let predictMarker = null;  // 推測位置
+  let routePtsCache = [];    // ルート線の座標配列（スナップ用）
+
+  // GPS watch / loss detect
+  let watchId = null;
+  let lastFixAt = 0;
+  let gpsLost = false;
+  let lostNotified = false;
+
+  // Recommended thresholds
+  const GPS_LOST_MS = 12_000;     // 12秒更新なしでロスト
+  const PREDICT_MAX_MS = 90_000;  // 推測は最大90秒
+  const SNAP_ROUTE_M = 55;        // ルート線に55m以内ならスナップ
+  const PREDICT_STEP_MS = 1000;   // 推測更新間隔
+
+  // current location / motion
+  let currentMarker = null;
+  let currentLatLng = null;
+  let lastSpeedMps = null;  // pos.coords.speed (m/s)
+  let headingDeg = null;    // コンパス方位（0=N）
+  let lastHeadingAt = 0;
+  let predictTimer = null;
+  let lostStartedAt = 0;
+  let lostBase = null;      // {lat,lng, t, speed, heading}
+  const hdgPill = $("hdgPill");
+
+  // adjust mode
+  let adjustingId = null;
+  let adjustMarker = null;
+  let adjustLatLng = null;
+
+  const adjustBar = $("adjustBar");
+  const adjustMsg = $("adjustMsg");
+
+  // ========= Address normalization =========
+  function normalizeAddress(a){
+    return (a || "")
+      .replace(/[‐-–—−]/g, "-")
+      .replace(/[ 　]+/g, " ")
+      .replace(/(〒\s*\d{3}-?\d{4})/g, "")
+      .replace(/(号室|室|階|F).*/g, "")
+      .trim();
+  }
+  function stripBuilding(a){
+    return (a || "")
+      .replace(/(ビル|マンション|ハイツ|コーポ|アパート|タワー|メゾン|レジデンス|ハウス|コート).*/g, "")
+      .trim();
+  }
+  function memKey(address){
+    return normalizeAddress(address).toLowerCase();
+  }
+
+  // ========= Pin memory =========
+  function loadPinMemory(address){
+    const k = memKey(address);
+    if(!k) return null;
+    try{
+      const mem = JSON.parse(localStorage.getItem(PIN_MEMORY_KEY) || "{}");
+      return mem[k] || null;
+    }catch(e){ return null; }
+  }
+  function savePinMemory(address, lat, lng){
+    const k = memKey(address);
+    if(!k) return;
+    const mem = JSON.parse(localStorage.getItem(PIN_MEMORY_KEY) || "{}");
+    mem[k] = { lat, lng, updatedAt: Date.now() };
+    localStorage.setItem(PIN_MEMORY_KEY, JSON.stringify(mem));
+  }
+
+  // ========= Geo cache =========
+  function loadGeoCache(){
+    try{ return JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || "{}") || {}; }
+    catch(e){ return {}; }
+  }
+  function saveGeoCache(cache){
+    localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(cache));
+  }
+  function cacheKey(addr){
+    return (addr || "").toString().trim().toLowerCase();
+  }
+
+  // ========= Persistence =========
+  function load(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) stops = JSON.parse(raw) || [];
+    }catch(e){ stops = []; }
+  }
+  function save(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stops));
+  }
+
+  // ========= Map =========
+  const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12);
+  L.control.zoom({ position: "bottomright" }).addTo(map);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap"
+  }).addTo(map);
+
+  const markersLayer = L.layerGroup().addTo(map);
+
+  // tap/long press: move adjust marker
+  map.on("click", (e) => {
+    if(!adjustingId || !adjustMarker) return;
+    adjustMarker.setLatLng(e.latlng);
+    adjustLatLng = { lat: e.latlng.lat, lng: e.latlng.lng };
+  });
+  map.on("contextmenu", (e) => {
+    if(!adjustingId || !adjustMarker) return;
+    adjustMarker.setLatLng(e.latlng);
+    adjustLatLng = { lat: e.latlng.lat, lng: e.latlng.lng };
+  });
+
+  // ========= Distance helpers =========
+  function distanceMeters(a, b){
+    const R = 6371000;
+    const toRad = (d) => d * Math.PI / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const x = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(x));
+  }
+
+  // ========= Simple route snapping (④代替) =========
+  // lat/lngを近似平面にして最近点を求める（短距離用）
+  function snapToRouteIfNear(pos){
+    if(!routePtsCache || routePtsCache.length < 2) return pos;
+
+    // ルート線の最近点（線分）を探す
+    const lat0 = pos.lat * Math.PI/180;
+    const kx = 111320 * Math.cos(lat0); // deg->m approx
+    const ky = 110540;
+
+    const px = pos.lng * kx;
+    const py = pos.lat * ky;
+
+    let best = null;
+    let bestD2 = Infinity;
+
+    for(let i=0;i<routePtsCache.length-1;i++){
+      const a = routePtsCache[i];
+      const b = routePtsCache[i+1];
+
+      const ax = a.lng * kx, ay = a.lat * ky;
+      const bx = b.lng * kx, by = b.lat * ky;
+
+      const vx = bx - ax, vy = by - ay;
+      const wx = px - ax, wy = py - ay;
+
+      const vv = vx*vx + vy*vy;
+      let t = vv ? (wx*vx + wy*vy)/vv : 0;
+      t = Math.max(0, Math.min(1, t));
+
+      const cx = ax + t*vx;
+      const cy = ay + t*vy;
+
+      const dx = px - cx, dy = py - cy;
+      const d2 = dx*dx + dy*dy;
+
+      if(d2 < bestD2){
+        bestD2 = d2;
+        best = { x: cx, y: cy, kx, ky };
+      }
+    }
+
+    if(!best) return pos;
+    const d = Math.sqrt(bestD2); // meters
+    if(d > SNAP_ROUTE_M) return pos;
+
+    // snapped point back to lat/lng
+    return { lat: best.y / best.ky, lng: best.x / best.kx, snapped: true };
+  }
+
+  // ========= Adjust mode =========
+  function startAdjust(id){
+    const s = stops.find(x => x.id === id);
+    if(!s) return;
+
+    adjustingId = id;
+    adjustLatLng = { lat: s.lat, lng: s.lng };
+
+    if(adjustMarker){
+      map.removeLayer(adjustMarker);
+      adjustMarker = null;
+    }
+
+    adjustMarker = L.marker([s.lat, s.lng], { draggable: true })
+      .addTo(map)
+      .bindPopup("📍 調整中（ドラッグ / タップ / 長押し）")
+      .openPopup();
+
+    adjustMarker.on("dragend", () => {
+      const p = adjustMarker.getLatLng();
+      adjustLatLng = { lat: p.lat, lng: p.lng };
+    });
+
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
+    adjustBar.style.display = "flex";
+    adjustMsg.textContent = "ピンをドラッグ（またはタップ/長押し）で移動 → ✅確定";
+    toast("調整モードに入りました");
+  }
+
+  function cancelAdjust(silent=false){
+    adjustingId = null;
+    adjustLatLng = null;
+    if(adjustMarker){
+      map.removeLayer(adjustMarker);
+      adjustMarker = null;
+    }
+    adjustBar.style.display = "none";
+    if(!silent) toast("キャンセルしました");
+  }
+
+  function confirmAdjust(){
+    if(!adjustingId || !adjustLatLng){ cancelAdjust(); return; }
+    const s = stops.find(x => x.id === adjustingId);
+    if(!s){ cancelAdjust(); return; }
+
+    s.lat = adjustLatLng.lat;
+    s.lng = adjustLatLng.lng;
+    save();
+    savePinMemory(s.address, s.lat, s.lng);
+
+    redrawMarkers();
+    renderList();
+
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
+    toast("確定しました ✅");
+    cancelAdjust(true);
+  }
+
+  // ========= QR(URL params) -> inputs =========
+  function applyQueryToInputs(){
+    try{
+      const u = new URL(location.href);
+      const qName = u.searchParams.get("name") || "";
+      const qAddr = u.searchParams.get("addr") || u.searchParams.get("address") || "";
+      if(!qName && !qAddr) return;
+
+      if(qName) $("name").value = qName;
+      if(qAddr) $("addr").value = qAddr;
+      toast("QRから入力しました（登録を押してください）");
+
+      u.search = "";
+      history.replaceState({}, "", u.toString());
+      $("addr").focus();
+    }catch(e){ console.warn(e); }
+  }
+
+  // ========= Zip -> address =========
+  async function fetchAddressByZip(zipRaw){
+    const zip = (zipRaw || "").replace(/[^\d]/g, "");
+    if(zip.length !== 7) throw new Error("郵便番号は7桁で入力してください");
+    const url = `https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zip}`;
+    const res = await fetch(url);
+    const j = await res.json();
+    if(j.status !== 200 || !j.results || !j.results[0]){
+      throw new Error("郵便番号から住所が見つかりません");
+    }
+    const r = j.results[0];
+    return `${r.address1}${r.address2}${r.address3}`;
+  }
+
+  // ========= Geocoding via Vercel API =========
+  async function geocodeAddress(address){
+    const url = new URL("/api/geocode", location.origin);
+    url.searchParams.set("q", address);
+    const res = await fetch(url.toString(), { headers: { "Accept":"application/json" } });
+    if(!res.ok) throw new Error(`APIエラー(${res.status})`);
+    const j = await res.json();
+    if(!j.ok || !j.found) return null;
+    return { lat: j.lat, lng: j.lng, display: j.display };
+  }
+
+  async function geocodeWithFallback(rawAddress){
+    const cache = loadGeoCache();
+    const a1 = normalizeAddress(rawAddress);
+    if(a1){
+      const k = cacheKey(a1);
+      if(cache[k]) return cache[k];
+    }
+    let geo = null;
+    if(a1) geo = await geocodeAddress(a1);
+    if(!geo){
+      const a2 = stripBuilding(a1);
+      if(a2 && a2 !== a1){
+        const k2 = cacheKey(a2);
+        if(cache[k2]) return cache[k2];
+        geo = await geocodeAddress(a2);
+      }
+    }
+    if(geo){
+      const k = cacheKey(a1);
+      cache[k] = geo;
+      saveGeoCache(cache);
+    }
+    return geo;
+  }
+
+  // ========= Render =========
+  function updatePills(){
+    $("countPill").textContent = `件数：${stops.length}`;
+  }
+
+  function iconForStop(index, status){
+    const n = index + 1;
+    const bg = status === "done" ? "rgba(255,255,255,.18)" : "rgba(110,168,255,.28)";
+    const bd = status === "done" ? "rgba(255,255,255,.22)" : "rgba(110,168,255,.55)";
+    const color = "rgba(233,238,252,.95)";
+    return L.divIcon({
+      className: "",
+      html: `
+        <div style="
+          width:34px;height:34px;border-radius:999px;
+          display:grid;place-items:center;
+          background:${bg};
+          border:1px solid ${bd};
+          color:${color};
+          font-weight:900;
+          box-shadow:0 10px 30px rgba(0,0,0,.35);
+          backdrop-filter: blur(6px);
+        ">${n}</div>
+      `,
+      iconSize: [34,34],
+      iconAnchor: [17,34]
+    });
+  }
+
+  function drawRouteLine(){
+    // 未完了だけ
+    const pts = stops.filter(s => s.status === "pending").map(s => [s.lat, s.lng]);
+
+    // cache for snapping (as objects)
+    routePtsCache = stops.filter(s => s.status === "pending").map(s => ({ lat: s.lat, lng: s.lng }));
+
+    if(routeLine){
+      map.removeLayer(routeLine);
+      routeLine = null;
+    }
+    if(pts.length < 2) return;
+
+    routeLine = L.polyline(pts, { weight: 4, opacity: 0.9 }).addTo(map);
+  }
+
+  function redrawMarkers(){
+    markersLayer.clearLayers();
+    stops.forEach((s, i) => {
+      L.marker([s.lat, s.lng], { icon: iconForStop(i, s.status) })
+        .addTo(markersLayer)
+        .bindPopup(`<b>${esc(s.name || "（名称なし）")}</b><br>${esc(s.address)}`);
+    });
+    drawRouteLine();
+  }
+
+  function renderList(){
+    const list = $("list");
+    list.innerHTML = "";
+
+    const pending = stops.filter(s => s.status === "pending");
+    const done = stops.filter(s => s.status === "done");
+    const ordered = [...pending, ...done];
+
+    ordered.forEach((s) => {
+      const idx = stops.findIndex(x => x.id === s.id);
+      const card = document.createElement("div");
+      card.className = "card" + (s.status === "done" ? " done" : "");
+      card.innerHTML = `
+        <div>
+          <div class="name"><span class="num">${idx+1}</span>${esc(s.name || "（名称なし）")}</div>
+          <div class="addr">${esc(s.address)}</div>
+        </div>
+        <div class="actions">
+          <button class="btn small primary" data-action="nav" data-id="${esc(s.id)}">▶ ナビ</button>
+          <button class="btn small good" data-action="done" data-id="${esc(s.id)}">✔ 完了</button>
+          <button class="btn small" data-action="focus" data-id="${esc(s.id)}">🗺 地図</button>
+          <button class="btn small" data-action="adjust" data-id="${esc(s.id)}">📍 調整</button>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+
+    updatePills();
+  }
+
+  function focusStop(id){
+    const s = stops.find(x => x.id === id);
+    if(!s) return;
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 16), { animate:true });
+  }
+
+  function fitAll(){
+    const pending = stops.filter(s => s.status === "pending");
+    if(pending.length === 0){
+      toast(stops.length ? "未完了がありません" : "目的地がありません");
+      return;
+    }
+    const latlngs = pending.map(s => [s.lat, s.lng]);
+    map.fitBounds(L.latLngBounds(latlngs).pad(0.22));
+  }
+
+  // ========= Optimize order (A: current location start) =========
+  function dist2(a, b){
+    const dx = a.lat - b.lat;
+    const dy = a.lng - b.lng;
+    return dx*dx + dy*dy;
+  }
+
+  function optimizeOrder(){
+    const pending = stops.filter(s => s.status === "pending");
+    const done = stops.filter(s => s.status === "done");
+    if(pending.length <= 2){ toast("最適化する件数が少ないです"); return; }
+
+    const start = currentLatLng
+      ? { lat: currentLatLng.lat, lng: currentLatLng.lng }
+      : { lat: pending[0].lat, lng: pending[0].lng };
+
+    const remaining = pending.slice();
+    const ordered = [];
+    let cur = start;
+
+    while(remaining.length){
+      let bestIdx = 0, bestD = Infinity;
+      for(let i=0;i<remaining.length;i++){
+        const d = dist2(cur, remaining[i]);
+        if(d < bestD){ bestD = d; bestIdx = i; }
+      }
+      const next = remaining.splice(bestIdx, 1)[0];
+      ordered.push(next);
+      cur = { lat: next.lat, lng: next.lng };
+    }
+
+    stops = [...ordered, ...done];
+    save();
+    redrawMarkers();
+    renderList();
+    toast(currentLatLng ? "現在地から近い順に並べ替えました" : "近い順に並べ替えました");
+  }
+
+  // ========= Actions =========
+  async function addStop(){
+    const now = Date.now();
+    if(now - lastAddAt < ADD_COOLDOWN_MS){ toast("連続追加は少し待ってね"); return; }
+    lastAddAt = now;
+
+    const name = $("name").value.trim();
+    const addressRaw = $("addr").value.trim();
+    if(!addressRaw){ toast("住所を入力してください"); $("addr").focus(); return; }
+
+    $("addBtn").disabled = true;
+    $("addBtn").textContent = "…座標化中";
+
+    try{
+      const remembered = loadPinMemory(addressRaw);
+
+      let lat, lng;
+      if(remembered){
+        lat = Number(remembered.lat);
+        lng = Number(remembered.lng);
+        toast("保存済みの入口位置を使用しました");
+      }else{
+        const geo = await geocodeWithFallback(addressRaw);
+        if(!geo){
+          toast("住所が見つかりませんでした。\n・県市から入れる\n・建物名/部屋番号を外す\nを試してください");
+          return;
+        }
+        lat = geo.lat; lng = geo.lng;
+      }
+
+      const id = crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2);
+
+      stops.push({
+        id,
+        name: name || "",
+        address: addressRaw,
+        lat, lng,
+        status: "pending",
+        createdAt: Date.now()
+      });
+
+      save();
+      redrawMarkers();
+      renderList();
+
+      map.setView([lat, lng], 16, { animate:true });
+
+      $("name").value = "";
+      $("addr").value = "";
+      $("zip").value = "";
+      $("name").focus();
+
+      if(!remembered) toast("追加しました");
+    }catch(e){
+      console.error(e);
+      toast(`座標化に失敗しました。\n${e?.message || "通信/設定を確認"}`);
+    }finally{
+      $("addBtn").disabled = false;
+      $("addBtn").textContent = "＋ 登録";
+    }
+  }
+
+  function setDone(id){
+    const s = stops.find(x => x.id === id);
+    if(!s) return;
+    s.status = (s.status === "done") ? "pending" : "done";
+    save();
+    redrawMarkers();
+    renderList();
+  }
+
+  function openNav(id){
+    const s = stops.find(x => x.id === id);
+    if(!s) return;
+
+    const base = new URL("https://www.google.com/maps/dir/");
+    if(currentLatLng){
+      base.pathname = `/maps/dir/${currentLatLng.lat},${currentLatLng.lng}/${s.lat},${s.lng}/`;
+    }else{
+      base.pathname = "/maps/search/";
+      base.searchParams.set("api", "1");
+      base.searchParams.set("query", `${s.lat},${s.lng}`);
+    }
+    window.open(base.toString(), "_blank");
+  }
+
+  function clearAll(){
+    if(!confirm("全ての行先を消去します。よろしいですか？")) return;
+    stops = [];
+    save();
+    redrawMarkers();
+    renderList();
+    toast("全消去しました（入口記憶は残ります）");
+  }
+
+  // ========= GPS watch + loss detection (②) =========
+  function setGpsPill(text, isWarn=false){
+    const el = $("gpsPill");
+    el.textContent = text;
+    el.classList.toggle("warn", !!isWarn);
+  }
+
+  function updateHeadingPill(){
+    if(headingDeg == null){
+      hdgPill.textContent = "方位：—";
+      return;
+    }
+    const d = Math.round(headingDeg);
+    hdgPill.textContent = `方位：${d}°`;
+  }
+
+  function startWatch(){
+    if(!navigator.geolocation){
+      $("geoPill").textContent = "位置情報：非対応";
+      setGpsPill("GPS：非対応", true);
+      toast("位置情報が使えません");
+      return;
+    }
+
+    if(watchId){
+      // already watching
+      toast("GPS監視中です");
+      return;
+    }
+
+    setGpsPill("GPS：監視開始…");
+    $("geoPill").textContent = "位置情報：監視中…";
+
+    watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
+      enableHighAccuracy: true,
+      timeout: 12000,
+      maximumAge: 2000
+    });
+
+    // loss monitor tick
+    if(!predictTimer){
+      predictTimer = setInterval(checkGpsLossAndPredict, PREDICT_STEP_MS);
+    }
+  }
+
+  function stopWatch(){
+    if(watchId){
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+    if(predictTimer){
+      clearInterval(predictTimer);
+      predictTimer = null;
+    }
+    setGpsPill("GPS：停止");
+    $("geoPill").textContent = "位置情報：未取得";
+  }
+
+  function onPos(pos){
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    lastFixAt = Date.now();
+
+    // speed (m/s) sometimes null
+    if(typeof pos.coords.speed === "number" && !Number.isNaN(pos.coords.speed)){
+      lastSpeedMps = pos.coords.speed;
+    }
+
+    // ④：ルート線が近ければスナップ（市街地の飛びを抑える）
+    const raw = { lat, lng };
+    const snapped = snapToRouteIfNear(raw);
+
+    currentLatLng = { lat: snapped.lat, lng: snapped.lng };
+
+    if(currentMarker){
+      currentMarker.setLatLng([currentLatLng.lat, currentLatLng.lng]);
+    }else{
+      currentMarker = L.circleMarker([currentLatLng.lat, currentLatLng.lng], {
+        radius: 8, weight: 2, opacity: 1, fillOpacity: .35
+      }).addTo(map).bindPopup("現在地");
+    }
+
+    // GPS復帰処理
+    if(gpsLost){
+      gpsLost = false;
+      lostNotified = false;
+      setGpsPill("GPS：復帰");
+      toast("GPSが復帰しました");
+      if(navigator.vibrate) navigator.vibrate([80, 60, 80]);
+      hidePredictMarker();
+    }else{
+      setGpsPill("GPS：OK");
+    }
+
+    $("geoPill").textContent = "位置情報：OK";
+  }
+
+  function onPosErr(err){
+    console.warn(err);
+    $("geoPill").textContent = "位置情報：NG";
+    setGpsPill("GPS：NG", true);
+    toast("位置情報の取得に失敗（許可/電波/省電力設定を確認）");
+  }
+
+  function checkGpsLossAndPredict(){
+    if(!watchId) return;
+
+    const now = Date.now();
+    const dt = now - lastFixAt;
+
+    if(lastFixAt === 0){
+      setGpsPill("GPS：監視中…");
+      return;
+    }
+
+    // ロスト判定
+    if(dt >= GPS_LOST_MS){
+      if(!gpsLost){
+        gpsLost = true;
+        lostStartedAt = now;
+        lostBase = currentLatLng ? {
+          lat: currentLatLng.lat,
+          lng: currentLatLng.lng,
+          t: now,
+          speed: lastSpeedMps,
+          heading: headingDeg
+        } : null;
+
+        setGpsPill("GPS：ロスト", true);
+        if(!lostNotified){
+          lostNotified = true;
+          toast("GPSロスト中（トンネル等）。地図/目的地は表示されます");
+          if(navigator.vibrate) navigator.vibrate([180, 120, 180]);
+        }
+      }else{
+        setGpsPill("GPS：ロスト", true);
+      }
+
+      // ③ 推測位置（速度+方位がある場合のみ、90秒まで）
+      tryPredict(now);
+      return;
+    }
+
+    // OK継続
+    if(!gpsLost){
+      setGpsPill("GPS：OK");
+    }
+  }
+
+  function showPredictMarker(latlng){
+    if(!predictMarker){
+      predictMarker = L.circleMarker([latlng.lat, latlng.lng], {
+        radius: 7,
+        weight: 2,
+        opacity: 0.9,
+        fillOpacity: 0.12,
+        dashArray: "6 6"
+      }).addTo(map).bindPopup("推測位置（GPSロスト中）");
+    }else{
+      predictMarker.setLatLng([latlng.lat, latlng.lng]);
+    }
+  }
+
+  function hidePredictMarker(){
+    if(predictMarker){
+      map.removeLayer(predictMarker);
+      predictMarker = null;
+    }
+  }
+
+  function tryPredict(now){
+    if(!lostBase) return;
+
+    const elapsed = now - lostBase.t;
+    if(elapsed <= 0) return;
+
+    if(elapsed > PREDICT_MAX_MS){
+      // 推測期限終了
+      hidePredictMarker();
+      return;
+    }
+
+    const sp = lostBase.speed;
+    const hdg = lostBase.heading;
+
+    if(!(typeof sp === "number" && sp > 0.6 && typeof hdg === "number")){
+      // 速度/方位が取れないなら推測しない（誤差が大きいので）
+      hidePredictMarker();
+      return;
+    }
+
+    // 直線推測：距離 = 速度 * 時間
+    const dist = sp * (elapsed/1000);
+    // ただし過大になりやすいので上限
+    const distCapped = Math.min(dist, 1200); // 1.2km上限
+
+    // 方位（0=N）から移動先を計算（簡易）
+    const rad = hdg * Math.PI / 180;
+    const dNorth = Math.cos(rad) * distCapped;
+    const dEast  = Math.sin(rad) * distCapped;
+
+    // meters -> degrees approx
+    const lat = lostBase.lat + (dNorth / 110540);
+    const lng = lostBase.lng + (dEast  / (111320 * Math.cos(lostBase.lat * Math.PI/180)));
+
+    // ④の代替：推測点もルート線に近ければスナップ
+    const snapped = snapToRouteIfNear({ lat, lng });
+
+    showPredictMarker(snapped);
+  }
+
+  // ========= Compass (②補助) =========
+  function initCompass(){
+    // iOSはユーザー操作で許可が必要な場合あり
+    const handler = (e) => {
+      let h = null;
+      // iOS: webkitCompassHeading (0=N)
+      if(typeof e.webkitCompassHeading === "number"){
+        h = e.webkitCompassHeading;
+      }else if(typeof e.alpha === "number"){
+        // alpha: 0..360 (device orientation). 環境によって北基準でないこともあるので「補助」扱い
+        h = 360 - e.alpha;
+      }
+      if(h == null || Number.isNaN(h)) return;
+
+      headingDeg = (h + 360) % 360;
+      lastHeadingAt = Date.now();
+      updateHeadingPill();
+    };
+
+    // 許可が必要な環境（主にiOS）
+    if(typeof DeviceOrientationEvent !== "undefined" &&
+       typeof DeviceOrientationEvent.requestPermission === "function"){
+      // 許可は「ユーザー操作イベント」内で呼ぶ必要があるので、現在地ボタン内で呼ぶ
+      window.__requestCompassPermission = async () => {
+        try{
+          const p = await DeviceOrientationEvent.requestPermission();
+          if(p === "granted"){
+            window.addEventListener("deviceorientation", handler, true);
+            toast("方位センサーを有効化しました");
+          }else{
+            toast("方位センサーが許可されませんでした");
+          }
+        }catch(e){
+          console.warn(e);
+          toast("方位センサーの許可に失敗");
+        }
+      };
+    }else{
+      // Android等：そのまま購読
+      window.addEventListener("deviceorientationabsolute", handler, true);
+      window.addEventListener("deviceorientation", handler, true);
+    }
+  }
+
+  // ========= Speech =========
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recog = null;
+  function initSpeech(){
+    if(!SpeechRecognition){ $("speechPill").textContent = "音声：非対応"; return; }
+    $("speechPill").textContent = "音声：OK";
+    recog = new SpeechRecognition();
+    recog.lang = "ja-JP";
+    recog.interimResults = false;
+    recog.maxAlternatives = 1;
+  }
+  function speakToInput(inputEl){
+    if(!recog){ toast("音声入力が使えません（Chrome系推奨）"); return; }
+    try{ recog.abort(); }catch(e){}
+    toast("話してください…");
+    recog.onresult = (ev) => {
+      const text = ev.results[0][0].transcript || "";
+      const cur = inputEl.value.trim();
+      inputEl.value = cur ? (cur + " " + text) : text;
+      toast("入力しました");
+    };
+    recog.onerror = () => toast("音声入力に失敗（権限/HTTPSを確認）");
+    recog.start();
+  }
+
+  // ========= API health check =========
+  async function apiCheck(){
+    try{
+      const url = new URL("/api/geocode", location.origin);
+      url.searchParams.set("q", "滋賀県大津市浜大津");
+      const res = await fetch(url.toString(), { headers: { "Accept":"application/json" } });
+      if(!res.ok) throw new Error("NG");
+      const j = await res.json();
+      $("netPill").textContent = (j && j.ok) ? "API：OK" : "API：NG";
+    }catch(e){
+      $("netPill").textContent = "API：NG";
+    }
+  }
+
+  // ========= PWA register (①) =========
+  async function registerSW(){
+    if(!("serviceWorker" in navigator)) return;
+    try{
+      await navigator.serviceWorker.register("/sw.js");
+      // toast("オフライン対応（最小）を有効化しました"); // 鬱陶しければOFF
+    }catch(e){
+      console.warn("SW register failed", e);
+    }
+  }
+
+  // ========= Event bindings =========
+  $("addBtn").addEventListener("click", addStop);
+  $("clearBtn").addEventListener("click", clearAll);
+  $("fitBtn").addEventListener("click", fitAll);
+  $("optBtn").addEventListener("click", optimizeOrder);
+
+  $("cancelAdjustBtn").addEventListener("click", () => cancelAdjust(false));
+  $("confirmAdjustBtn").addEventListener("click", confirmAdjust);
+
+  $("name").addEventListener("keydown", (e) => { if(e.key === "Enter") $("addr").focus(); });
+  $("addr").addEventListener("keydown", (e) => { if(e.key === "Enter") addStop(); });
+  $("zip").addEventListener("keydown", (e) => { if(e.key === "Enter") $("zipBtn").click(); });
+
+  $("zipBtn").addEventListener("click", async () => {
+    const zip = $("zip").value.trim();
+    if(!zip){ toast("郵便番号を入力してください"); $("zip").focus(); return; }
+    $("zipBtn").disabled = true;
+    try{
+      const addr = await fetchAddressByZip(zip);
+      const cur = $("addr").value.trim();
+      $("addr").value = cur ? (addr + " " + cur) : addr;
+      toast("住所を補完しました。番地を入力してください");
+      $("addr").focus();
+    }catch(e){
+      toast(e.message || "郵便番号検索に失敗しました");
+    }finally{
+      $("zipBtn").disabled = false;
+    }
+  });
+
+  $("micName").addEventListener("click", () => speakToInput($("name")));
+  $("micAddr").addEventListener("click", () => speakToInput($("addr")));
+
+  $("list").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if(!btn) return;
+    const id = btn.getAttribute("data-id");
+    const action = btn.getAttribute("data-action");
+    if(!id || !action) return;
+
+    if(action === "nav") openNav(id);
+    if(action === "done") setDone(id);
+    if(action === "focus") focusStop(id);
+    if(action === "adjust") startAdjust(id);
+  });
+
+  // 現在地ボタン：GPS監視を開始（ロスト検知の前提）
+  $("locBtn").addEventListener("click", async () => {
+    // iOSコンパス許可（必要な場合のみ）
+    if(typeof window.__requestCompassPermission === "function"){
+      await window.__requestCompassPermission();
+      window.__requestCompassPermission = null;
+    }
+    startWatch();
+    // 現在地へ寄せる（初回fixが来たら勝手に更新される）
+    toast("GPS監視を開始しました（トンネルでロスト検知します）");
+  });
+
+  // ========= Boot =========
+  load();
+  initSpeech();
+  initCompass();
+  redrawMarkers();
+  renderList();
+
+  if(SpeechRecognition) $("speechPill").textContent = "音声：OK";
+  else $("speechPill").textContent = "音声：非対応";
+
+  if(navigator.geolocation) $("geoPill").textContent = "位置情報：未取得";
+  else $("geoPill").textContent = "位置情報：非対応";
+
+  setGpsPill("GPS：未監視");
+  updateHeadingPill();
+
+  apiCheck();
+  applyQueryToInputs();
+  registerSW();
+
+})();
+</script>
+</body>
+</html>
+
 
