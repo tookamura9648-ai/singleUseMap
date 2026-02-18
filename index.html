@@ -37,11 +37,6 @@
       color:var(--text);
     }
 
-    /* 横書き固定（縦書き残骸対策） */
-body{
-  writing-mode: horizontal-tb !important;
-  text-orientation: mixed !important;
-}
     header{
       position:sticky; top:0; z-index:50;
       padding:10px 12px 12px;
@@ -196,6 +191,11 @@ body{
       color: var(--muted);
       line-height: 1.35;
     }
+    /* 縦書き残骸の完全除去 */
+*{
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+}
   </style>
 </head>
 
