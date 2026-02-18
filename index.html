@@ -142,17 +142,14 @@
       grid-template-columns: 1fr auto;
       gap: 10px;
     }
-    .card.done{ opacity:.55; filter:saturate(.7); }
-    .num{ font-weight:900; color: rgba(233,238,252,.9); margin-right:8px; }
-    .name{ font-weight:800; font-size:15px; }
-    .addr{ color: var(--muted); font-size:12.5px; margin-top:2px; line-height:1.35; }
-    .actions{ display:flex; flex-direction:column; gap:8px; justify-content:center; }
-    .hint{
-      color: rgba(233,238,252,.55);
-      font-size:12px;
-      margin-top:10px;
-      line-height:1.45;
-    }
+    /* 完了の行だけ：薄い水色に */
+  .card.done{
+    opacity: 1;                 /* 透明にしすぎない */
+    filter: none;
+    background: rgba(110,168,255,.12);     /* 薄い水色 */
+    border-color: rgba(110,168,255,.28);
+  }
+
 
     .toast{
       position: fixed;
