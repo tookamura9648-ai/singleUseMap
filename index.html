@@ -134,15 +134,72 @@
       overflow:auto;
       padding-right: 4px;
     }
-    .card{
-      border:1px solid var(--line);
-      background: rgba(15,23,48,.68);
-      border-radius: var(--r);
-      padding: 10px;
-      display:grid;
-      grid-template-columns: 1fr auto;
-      gap: 10px;
-    }
+    .card {
+  border: 1px solid var(--line);
+  background: rgba(15, 23, 48, .68);
+  border-radius: var(--r);
+  padding: 12px;
+  display: flex; /* gridからflexに変更 */
+  flex-direction: column; /* 縦に並べる */
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+/* 名称と番号のスタイル */
+.card .name {
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card .num {
+  background: var(--accent);
+  color: #000;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+
+/* 住所の改行・視認性対策 */
+.card .addr {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+  word-break: break-all; /* 長い英数字でも強制改行 */
+  padding-left: 2px;
+  border-left: 2px solid var(--line); /* 住所の左に薄い線を引くと読みやすい */
+  padding-left: 8px;
+}
+
+/* アクションボタンを横一列に並べる（スマホで溢れないように） */
+.card .actions {
+  display: flex;
+  flex-wrap: wrap; /* ボタンが多い場合は折り返す */
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.card .actions .btn {
+  flex: 1; /* ボタンの幅を均等にする */
+  min-width: 70px; /* 小さくなりすぎないように */
+  padding: 8px 4px;
+  font-size: 12px;
+}
+
+/* 完了済みカードの見た目 */
+.card.done {
+  opacity: 0.6;
+  background: rgba(255, 255, 255, 0.05);
+}
+.card.done .name {
+  text-decoration: line-through;
+}
     
 
     .toast{
@@ -411,6 +468,20 @@
     adjustMarker.setLatLng(e.latlng);
     adjustLatLng = { lat: e.latlng.lat, lng: e.latlng.lng };
   });
+  const gsiStandard = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", {
+  attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>"
+});
+const gsiPale = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", {
+  attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>"
+});
+
+// レイヤー選択コントロールを右上に配置
+const baseMaps = {
+  "OSM (標準)": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OSM" }),
+  "地理院 (標準)": gsiStandard,
+  "地理院 (淡色)": gsiPale
+};
+L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
   // ========= Distance helpers =========
   function distanceMeters(a, b){
@@ -668,17 +739,18 @@
       const card = document.createElement("div");
       card.className = "card" + (s.status === "done" ? " done" : "");
       card.innerHTML = `
-        <div>
-          <div class="name"><span class="num">${idx+1}</span>${esc(s.name || "（名称なし）")}</div>
-          <div class="addr">${esc(s.address)}</div>
-        </div>
-        <div class="actions">
-          <button class="btn small primary" data-action="nav" data-id="${esc(s.id)}">▶ ナビ</button>
-          <button class="btn small good" data-action="done" data-id="${esc(s.id)}">✔ 完了</button>
-          <button class="btn small" data-action="focus" data-id="${esc(s.id)}">🗺 地図</button>
-          <button class="btn small" data-action="adjust" data-id="${esc(s.id)}">📍 調整</button>
-        </div>
-      `;
+  <div class="name">
+    <span class="num">${idx+1}</span>
+    ${esc(s.name || "（名称なし）")}
+  </div>
+  <div class="addr">${esc(s.address)}</div>
+  <div class="actions">
+    <button class="btn small primary" data-action="nav" data-id="${esc(s.id)}">▶ ナビ</button>
+    <button class="btn small good" data-action="done" data-id="${esc(s.id)}">${s.status === "done" ? "戻す" : "✔ 完了"}</button>
+    <button class="btn small" data-action="focus" data-id="${esc(s.id)}">🗺 地図</button>
+    <button class="btn small" data-action="adjust" data-id="${esc(s.id)}">📍 調整</button>
+  </div>
+`;
       list.appendChild(card);
     });
 
