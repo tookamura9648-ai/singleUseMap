@@ -574,49 +574,64 @@ L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
     toast("調整モードに入りました");
   }
 
-  function cancelAdjust(silent=false){
-    adjustingId = null;
-    adjustLatLng = null;
-    if(adjustMarker){
-      map.removeLayer(adjustMarker);
-      adjustMarker = null;
-    }
-    adjustBar.style.display = "none";
-    if(!silent) toast("キャンセルしました");
+  function cancelAdjust(showToast=true){
+  adjustingId = null;
+  adjustLatLng = null;
+
+  if(adjustMarker){
+    map.removeLayer(adjustMarker);
+    adjustMarker = null;
   }
-
-  function confirmAdjust(){
-    if(!adjustingId || !adjustLatLng){ cancelAdjust(); return; }
-    const s = stops.find(x => x.id === adjustingId);
-    if(!s){ cancelAdjust(); return; }
-
-    s.lat = adjustLatLng.lat;
-    s.lng = adjustLatLng.lng;
-    save();
-    savePinMemory(s.address, s.lat, s.lng);
-
-    redrawMarkers();
-    renderList();
-
-    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
-    toast("確定しました ✅");
-    cancelAdjust(true);
-    // 共有DBに保存
-try{
-  await fetch("/api/savePoint", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      address: currentAdjustAddress,
-      lat: adjustMarker.getLatLng().lat,
-      lng: adjustMarker.getLatLng().lng
-    })
-  });
-  toast("共有保存しました");
-}catch(e){
-  console.log("共有保存失敗", e);
+  adjustBar.style.display = "none";
+  if(showToast) toast("キャンセルしました");
 }
+
+  async function confirmAdjust(){
+  if(!adjustingId || !adjustLatLng){
+    cancelAdjust(true);
+    return;
   }
+
+  const s = stops.find(x => x.id === adjustingId);
+  if(!s){
+    cancelAdjust(true);
+    return;
+  }
+
+  // ① stopsの座標を更新（確定）
+  s.lat = adjustLatLng.lat;
+  s.lng = adjustLatLng.lng;
+
+  // 端末内メモリにも保存（既存）
+  save();
+  savePinMemory(s.address, s.lat, s.lng);
+
+  // ② 共有DBに保存（ここは cancelAdjust する前に実行）
+  try{
+    await fetch("/api/savePoint", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        address: (s.address || "").trim(), // ★これをキーにする
+        lat: s.lat,
+        lng: s.lng
+      })
+    });
+    toast("共有保存しました");
+  }catch(e){
+    console.log("共有保存失敗", e);
+    toast("共有保存に失敗（ネットワーク/設定確認）");
+  }
+
+  // ③ UI更新
+  redrawMarkers();
+  renderList();
+  map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
+
+  // ④ 調整モード終了（トーストは出さない）
+  cancelAdjust(false);
+  toast("確定しました ✅");
+}
 
   // ========= QR(URL params) -> inputs =========
   function applyQueryToInputs(){
