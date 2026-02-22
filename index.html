@@ -601,6 +601,21 @@ L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
     map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
     toast("確定しました ✅");
     cancelAdjust(true);
+    // 共有DBに保存
+try{
+  await fetch("/api/savePoint", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({
+      address: currentAdjustAddress,
+      lat: adjustMarker.getLatLng().lat,
+      lng: adjustMarker.getLatLng().lng
+    })
+  });
+  toast("共有保存しました");
+}catch(e){
+  console.log("共有保存失敗", e);
+}
   }
 
   // ========= QR(URL params) -> inputs =========
@@ -637,14 +652,41 @@ L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
   // ========= Geocoding via Vercel API =========
   async function geocodeAddress(address){
-    const url = new URL("/api/geocode", location.origin);
-    url.searchParams.set("q", address);
-    const res = await fetch(url.toString(), { headers: { "Accept":"application/json" } });
-    if(!res.ok) throw new Error(`APIエラー(${res.status})`);
-    const j = await res.json();
-    if(!j.ok || !j.found) return null;
-    return { lat: j.lat, lng: j.lng, display: j.display };
+
+  // ① まず共有DBを確認
+  try {
+    const r = await fetch("/api/getPoint?address=" + encodeURIComponent(address));
+    const j = await r.json();
+
+    if(j.ok && j.found){
+      console.log("共有DBヒット");
+      return {
+        lat: j.lat,
+        lng: j.lng,
+        source: "shared"
+      };
+    }
+  } catch(e){
+    console.log("共有DB失敗 → 通常ジオコードへ");
   }
+
+  // ② なければ通常ジオコード
+  const url = new URL("/api/geocode", location.origin);
+  url.searchParams.set("q", address);
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if(!data.ok || !data.found){
+    throw new Error("住所が見つかりません");
+  }
+
+  return {
+    lat: data.lat,
+    lng: data.lng,
+    source: "geocode"
+  };
+}
 
   async function geocodeWithFallback(rawAddress){
     const cache = loadGeoCache();
