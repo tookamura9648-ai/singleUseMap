@@ -666,41 +666,23 @@ L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
   }
 
   // ========= Geocoding via Vercel API =========
-  async function geocodeAddress(address){
+  async function geocodeAddress(addr){
+  try{
+    const res = await fetch("/api/geocode?q=" + encodeURIComponent(addr));
+    const data = await res.json();
 
-  // ① まず共有DBを確認
-  try {
-    const r = await fetch("/api/getPoint?address=" + encodeURIComponent(address));
-    const j = await r.json();
-
-    if(j.ok && j.found){
-      console.log("共有DBヒット");
-      return {
-        lat: j.lat,
-        lng: j.lng,
-        source: "shared"
-      };
+    if(!data || !data.features || !data.features.length){
+      toast("住所が見つかりません");
+      return null;
     }
-  } catch(e){
-    console.log("共有DB失敗 → 通常ジオコードへ");
+
+    const [lng, lat] = data.features[0].geometry.coordinates;
+    return { lat, lng };
+
+  }catch(e){
+    toast("通信エラー（API）");
+    return null;
   }
-
-  // ② なければ通常ジオコード
-  const url = new URL("/api/geocode", location.origin);
-  url.searchParams.set("q", address);
-
-  const res = await fetch(url);
-  const data = await res.json();
-
-  if(!data.ok || !data.found){
-    throw new Error("住所が見つかりません");
-  }
-
-  return {
-    lat: data.lat,
-    lng: data.lng,
-    source: "geocode"
-  };
 }
 
   async function geocodeWithFallback(rawAddress){
