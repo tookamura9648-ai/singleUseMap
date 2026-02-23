@@ -283,7 +283,7 @@
         <div class="pill" id="countPill">件数：0</div>
         <div class="pill" id="speechPill">音声：未確認</div>
         <div class="pill" id="geoPill">位置情報：未確認</div>
-        <div class="pill" id="netPill">API：未確認</div>
+        
         <div class="pill" id="gpsPill">GPS：未監視</div>
         <div class="pill" id="hdgPill">方位：—</div>
       </div>
@@ -1225,20 +1225,7 @@ L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
     recog.start();
   }
 
-  // ========= API health check =========
-  async function apiCheck(){
-    try{
-      const url = new URL("/api/geocode", location.origin);
-      url.searchParams.set("q", "滋賀県大津市浜大津");
-      const res = await fetch(url.toString(), { headers: { "Accept":"application/json" } });
-      if(!res.ok) throw new Error("NG");
-      const j = await res.json();
-      $("netPill").textContent = (j && j.ok) ? "API：OK" : "API：NG";
-    }catch(e){
-      $("netPill").textContent = "API：NG";
-    }
-  }
-
+  
   // ========= PWA register (①) =========
   async function registerSW(){
     if(!("serviceWorker" in navigator)) return;
@@ -1324,7 +1311,6 @@ L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
   setGpsPill("GPS：未監視");
   updateHeadingPill();
 
-  apiCheck();
   applyQueryToInputs();
   registerSW();
 
