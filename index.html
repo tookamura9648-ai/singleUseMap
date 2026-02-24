@@ -754,6 +754,7 @@
     // 1回目
     try{
       const data = await fetchJsonWithTimeout(url, {}, 9000);
+      console.log("GEOCODE raw response:", data);
       const ll = extractLatLngFromGeocodeResponse(data);
       if(ll) return { lat: ll.lat, lng: ll.lng };
       return null;
