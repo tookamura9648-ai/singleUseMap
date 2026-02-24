@@ -468,20 +468,24 @@
     adjustMarker.setLatLng(e.latlng);
     adjustLatLng = { lat: e.latlng.lat, lng: e.latlng.lng };
   });
-  const gsiStandard = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", {
-  attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>"
-});
-const gsiPale = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", {
-  attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>"
-});
+    const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap"
+  }).addTo(map);
 
-// レイヤー選択コントロールを右上に配置
-const baseMaps = {
-  "OSM (標準)": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OSM" }),
-  "地理院 (標準)": gsiStandard,
-  "地理院 (淡色)": gsiPale
-};
-L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+  const gsiStandard = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", {
+    attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>"
+  });
+  const gsiPale = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", {
+    attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>"
+  });
+
+  const baseMaps = {
+    "OSM (標準)": osm,
+    "地理院 (標準)": gsiStandard,
+    "地理院 (淡色)": gsiPale
+  };
+  L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
   // ========= Distance helpers =========
   function distanceMeters(a, b){
@@ -666,48 +670,153 @@ L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
   }
 
   // ========= Geocoding via Vercel API =========
-  async function geocodeAddress(addr){
-  try{
-    const res = await fetch("/api/geocode?q=" + encodeURIComponent(addr));
-    const data = await res.json();
+    // ========= Geocoding via Vercel API (堅牢版) =========
+  function isValidLatLng(lat, lng){
+    // 日本ざっくり範囲（必要なら調整）
+    return (
+      typeof lat === "number" && typeof lng === "number" &&
+      isFinite(lat) && isFinite(lng) &&
+      lat >= 20 && lat <= 50 &&
+      lng >= 120 && lng <= 155
+    );
+  }
 
-    if(!data || !data.features || !data.features.length){
-      toast("住所が見つかりません");
-      return null;
-    }
-
-    const [lng, lat] = data.features[0].geometry.coordinates;
-    return { lat, lng };
-
-  }catch(e){
-    toast("通信エラー（API）");
+  function normalizeLatLngMaybeSwap(lat, lng){
+    // もし逆っぽい（latが120以上など）なら入れ替えを試す
+    if(isValidLatLng(lat, lng)) return { lat, lng, swapped:false };
+    if(isValidLatLng(lng, lat)) return { lat: lng, lng: lat, swapped:true };
     return null;
   }
-}
+
+  async function fetchJsonWithTimeout(url, opts={}, timeoutMs=9000){
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort("timeout"), timeoutMs);
+    try{
+      const res = await fetch(url, { ...opts, signal: ac.signal });
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      if(!res.ok){
+        // ここで本文を読むとCORSやHTMLで落ちるので最低限
+        throw new Error(`geocode http ${res.status}`);
+      }
+      if(!ct.includes("application/json")){
+        throw new Error("geocode not json");
+      }
+      return await res.json();
+    }finally{
+      clearTimeout(t);
+    }
+  }
+
+  function pickBestFeature(features){
+    // できれば「精度が高そう」なものを選ぶ（プロパティ名はAPI差があるので複数対応）
+    // score / relevance / confidence / importance などがあれば高い方を優先
+    const scored = features.map(f => {
+      const p = f.properties || {};
+      const s =
+        (typeof p.score === "number" ? p.score : null) ??
+        (typeof p.relevance === "number" ? p.relevance : null) ??
+        (typeof p.confidence === "number" ? p.confidence : null) ??
+        (typeof p.importance === "number" ? p.importance : null) ??
+        0;
+      return { f, s };
+    });
+    scored.sort((a,b)=> b.s - a.s);
+    return scored[0]?.f || null;
+  }
+
+  function extractLatLngFromGeocodeResponse(data){
+    // 1) GeoJSON FeatureCollection想定：features[].geometry.coordinates = [lng,lat]
+    if(data && Array.isArray(data.features) && data.features.length){
+      const best = pickBestFeature(data.features) || data.features[0];
+      const coords = best?.geometry?.coordinates;
+      if(Array.isArray(coords) && coords.length >= 2){
+        const lng = Number(coords[0]);
+        const lat = Number(coords[1]);
+        const fixed = normalizeLatLngMaybeSwap(lat, lng);
+        if(fixed) return fixed;
+      }
+    }
+
+    // 2) APIによっては {lat,lng} 直返し等
+    if(data && (("lat" in data) || ("lng" in data) || ("lon" in data))){
+      const lat = Number(data.lat);
+      const lng = Number(data.lng ?? data.lon);
+      const fixed = normalizeLatLngMaybeSwap(lat, lng);
+      if(fixed) return fixed;
+    }
+
+    return null;
+  }
+
+  async function geocodeAddress(addr){
+    const url = "/api/geocode?q=" + encodeURIComponent(addr);
+
+    // 1回目
+    try{
+      const data = await fetchJsonWithTimeout(url, {}, 9000);
+      const ll = extractLatLngFromGeocodeResponse(data);
+      if(ll) return { lat: ll.lat, lng: ll.lng };
+      return null;
+    }catch(e){
+      // たまに一時失敗するので軽くリトライ（タイムアウト/ネット系のみ）
+      const msg = (e && e.message) ? e.message : String(e);
+      const retryable = msg.includes("timeout") || msg.includes("Failed to fetch") || msg.includes("network");
+      if(!retryable) return null;
+
+      try{
+        await new Promise(r => setTimeout(r, 450));
+        const data2 = await fetchJsonWithTimeout(url, {}, 9000);
+        const ll2 = extractLatLngFromGeocodeResponse(data2);
+        if(ll2) return { lat: ll2.lat, lng: ll2.lng };
+      }catch(_e2){}
+      return null;
+    }
+  }
 
   async function geocodeWithFallback(rawAddress){
     const cache = loadGeoCache();
     const a1 = normalizeAddress(rawAddress);
-    if(a1){
-      const k = cacheKey(a1);
-      if(cache[k]) return cache[k];
+    if(!a1) return null;
+
+    // ① 端末内「入口記憶」を最優先（既存の loadPinMemory を使う）
+    const remembered = loadPinMemory(a1);
+    if(remembered && isValidLatLng(Number(remembered.lat), Number(remembered.lng))){
+      return { lat: Number(remembered.lat), lng: Number(remembered.lng) };
     }
-    let geo = null;
-    if(a1) geo = await geocodeAddress(a1);
+
+    // ② ローカル geocode キャッシュ
+    const k1 = cacheKey(a1);
+    if(cache[k1] && isValidLatLng(Number(cache[k1].lat), Number(cache[k1].lng))){
+      return cache[k1];
+    }
+
+    // ③ まず通常住所で geocode
+    let geo = await geocodeAddress(a1);
+
+    // ④ ダメなら建物名などを外して再試行
     if(!geo){
       const a2 = stripBuilding(a1);
       if(a2 && a2 !== a1){
         const k2 = cacheKey(a2);
-        if(cache[k2]) return cache[k2];
-        geo = await geocodeAddress(a2);
+        if(cache[k2] && isValidLatLng(Number(cache[k2].lat), Number(cache[k2].lng))){
+          geo = cache[k2];
+        }else{
+          geo = await geocodeAddress(a2);
+          if(geo){
+            cache[k2] = geo;
+          }
+        }
       }
     }
-    if(geo){
-      const k = cacheKey(a1);
-      cache[k] = geo;
+
+    // ⑤ 成功したらキャッシュ（a1にも保存して次回速く）
+    if(geo && isValidLatLng(Number(geo.lat), Number(geo.lng))){
+      cache[k1] = geo;
       saveGeoCache(cache);
+      return geo;
     }
-    return geo;
+
+    return null;
   }
 
   // ========= Render =========
