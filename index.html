@@ -725,28 +725,43 @@
   }
 
   function extractLatLngFromGeocodeResponse(data){
-    // 1) GeoJSON FeatureCollection想定：features[].geometry.coordinates = [lng,lat]
-    if(data && Array.isArray(data.features) && data.features.length){
-      const best = pickBestFeature(data.features) || data.features[0];
-      const coords = best?.geometry?.coordinates;
-      if(Array.isArray(coords) && coords.length >= 2){
-        const lng = Number(coords[0]);
-        const lat = Number(coords[1]);
-        const fixed = normalizeLatLngMaybeSwap(lat, lng);
-        if(fixed) return fixed;
-      }
-    }
 
-    // 2) APIによっては {lat,lng} 直返し等
-    if(data && (("lat" in data) || ("lng" in data) || ("lon" in data))){
-      const lat = Number(data.lat);
-      const lng = Number(data.lng ?? data.lon);
+  // ★ 追加：dataが直接配列の場合（あなたのケース）
+  if(Array.isArray(data) && data.length){
+    const f = data[0];
+    const coords = f?.geometry?.coordinates;
+    if(Array.isArray(coords) && coords.length >= 2){
+      const lng = Number(coords[0]);
+      const lat = Number(coords[1]);
       const fixed = normalizeLatLngMaybeSwap(lat, lng);
       if(fixed) return fixed;
     }
-
-    return null;
   }
+
+  // ① GeoJSON FeatureCollection形式
+  if(data && Array.isArray(data.features) && data.features.length){
+    const best = pickBestFeature(data.features) || data.features[0];
+    const coords = best?.geometry?.coordinates;
+    if(Array.isArray(coords) && coords.length >= 2){
+      const lng = Number(coords[0]);
+      const lat = Number(coords[1]);
+      const fixed = normalizeLatLngMaybeSwap(lat, lng);
+      if(fixed) return fixed;
+    }
+  }
+
+  // ② {lat,lng} 直返し対応
+  if(data && (("lat" in data) || ("lng" in data) || ("lon" in data))){
+    const lat = Number(data.lat);
+    const lng = Number(data.lng ?? data.lon);
+    const fixed = normalizeLatLngMaybeSwap(lat, lng);
+    if(fixed) return fixed;
+  }
+
+  return null;
+}
+
+    
 
   async function geocodeAddress(addr){
     const url = "/api/geocode?q=" + encodeURIComponent(addr);
