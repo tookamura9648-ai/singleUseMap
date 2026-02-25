@@ -673,23 +673,86 @@
     }catch(e){ console.warn(e); }
   }
 
-  <div id="ocrModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:10000; overflow:hidden;">
-  <video id="ocrVideo" style="width:100%; height:100%; object-fit:cover;" autoplay playsinline></video>
-  
-  <div id="scanGuide" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:85%; height:80px; border:2px solid #ff6b6b; border-radius:8px; box-shadow:0 0 0 4000px rgba(0,0,0,0.6); pointer-events:none;">
-    <div style="position:absolute; top:-25px; left:0; color:#ff6b6b; font-size:12px; font-weight:bold;">ここに住所を合わせる</div>
-  </div>
-//===========OCR_Input=============
-  <div style="position:absolute; bottom:30px; width:100%; display:flex; flex-direction:column; align-items:center; gap:15px;">
-    <div id="ocrStatus" style="color:#fff; font-size:14px; background:rgba(0,0,0,0.5); padding:5px 15px; border-radius:20px;">カメラ起動中...</div>
-    <div class="row" style="gap:20px;">
-      <button class="btn danger" id="ocrCloseBtn" style="padding:12px 24px;">閉じる</button>
-      <button class="btn primary" id="ocrCaptureBtn" style="padding:12px 24px; font-size:16px;">📷 読み取る</button>
-    </div>
-  </div>
+  // ========= OCR Logic =========
+let ocrStream = null;
 
-  <canvas id="ocrCanvas" style="display:none;"></canvas>
-</div>
+// モーダルと各要素の取得
+const ocrModal = $("ocrModal");
+const ocrVideo = $("ocrVideo");
+const ocrCanvas = $("ocrCanvas");
+const ocrStatus = $("ocrStatus");
+
+// カメラ起動
+async function startOCR() {
+  try {
+    ocrStatus.textContent = "カメラ準備中...";
+    ocrModal.style.display = "block";
+
+    // 背面カメラを指定して起動
+    ocrStream = await navigator.mediaDevices.getUserMedia({
+      video: { 
+        facingMode: "environment",
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    });
+    ocrVideo.srcObject = ocrStream;
+    ocrStatus.textContent = "枠内に住所を合わせてください";
+  } catch (e) {
+    console.error(e);
+    toast("カメラの起動に失敗しました。権限を確認してください。");
+    stopOCR();
+  }
+}
+
+// カメラ停止
+function stopOCR() {
+  if (ocrStream) {
+    ocrStream.getTracks().forEach(track => track.stop());
+    ocrStream = null;
+  }
+  ocrModal.style.display = "none";
+}
+
+// ガイド枠内の画像をキャプチャして解析（Tesseract.jsへの橋渡し）
+async function captureAddress() {
+  if (!ocrStream) return;
+
+  const ctx = ocrCanvas.getContext("2d");
+  
+  // ビデオの実際のサイズと表示サイズの比率を計算
+  const vW = ocrVideo.videoWidth;
+  const vH = ocrVideo.videoHeight;
+  
+  // Canvasサイズをビデオに合わせる
+  ocrCanvas.width = vW;
+  ocrCanvas.height = vH;
+  
+  // 現在のフレームをCanvasに描画
+  ctx.drawImage(ocrVideo, 0, 0, vW, vH);
+
+  // ここで本来はガイド枠の部分だけを切り出す(Crop)処理を入れると精度が上がります
+  // 今回は一旦「撮影成功」のトーストまで
+  if (navigator.vibrate) navigator.vibrate(50); // 成功の振動
+  ocrStatus.textContent = "解析中...";
+  
+  // ここに Tesseract.recognize(...) を呼び出す処理を記述します
+  toast("画像をキャプチャしました。解析を開始します。");
+  
+  // テスト用：3秒後に閉じる
+  setTimeout(() => {
+    ocrStatus.textContent = "枠内に住所を合わせてください";
+    // stopOCR(); // 本来は解析成功後に閉じる
+  }, 3000);
+}
+
+// イベント紐付け（DOM読み込み後に実行するように配置してください）
+document.getElementById("micAddr").insertAdjacentHTML('afterend', '<button class="btn icon" id="ocrOpenBtn" title="OCRスキャン">📷</button>');
+
+$("ocrOpenBtn").addEventListener("click", startOCR);
+$("ocrCloseBtn").addEventListener("click", stopOCR);
+$("ocrCaptureBtn").addEventListener("click", captureAddress);
   
   // ========= Zip -> address =========
   async function fetchAddressByZip(zipRaw){
