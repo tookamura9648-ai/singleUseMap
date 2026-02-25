@@ -307,6 +307,24 @@
         </div>
       </div>
 
+      <div id="ocrModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:10000; overflow:hidden;">
+        <video id="ocrVideo" style="width:100%; height:100%; object-fit:cover;" autoplay playsinline></video>
+        
+        <div id="scanGuide" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:85%; height:80px; border:2px solid #ff6b6b; border-radius:8px; box-shadow:0 0 0 4000px rgba(0,0,0,0.6); pointer-events:none;">
+          <div style="position:absolute; top:-25px; left:0; color:#ff6b6b; font-size:12px; font-weight:bold;">ここに住所を合わせる</div>
+        </div>
+      
+        <div style="position:absolute; bottom:30px; width:100%; display:flex; flex-direction:column; align-items:center; gap:15px;">
+          <div id="ocrStatus" style="color:#fff; font-size:14px; background:rgba(0,0,0,0.5); padding:5px 15px; border-radius:20px;">カメラ起動中...</div>
+          <div class="row" style="gap:20px;">
+            <button class="btn danger" id="ocrCloseBtn" style="padding:12px 24px;">閉じる</button>
+            <button class="btn primary" id="ocrCaptureBtn" style="padding:12px 24px; font-size:16px;">📷 読み取る</button>
+          </div>
+        </div>
+      
+        <canvas id="ocrCanvas" style="display:none;"></canvas>
+      </div>
+      
       <div class="list" id="list"></div>
 
       <div class="hint">
@@ -655,6 +673,24 @@
     }catch(e){ console.warn(e); }
   }
 
+  <div id="ocrModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:10000; overflow:hidden;">
+  <video id="ocrVideo" style="width:100%; height:100%; object-fit:cover;" autoplay playsinline></video>
+  
+  <div id="scanGuide" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:85%; height:80px; border:2px solid #ff6b6b; border-radius:8px; box-shadow:0 0 0 4000px rgba(0,0,0,0.6); pointer-events:none;">
+    <div style="position:absolute; top:-25px; left:0; color:#ff6b6b; font-size:12px; font-weight:bold;">ここに住所を合わせる</div>
+  </div>
+//===========OCR_Input=============
+  <div style="position:absolute; bottom:30px; width:100%; display:flex; flex-direction:column; align-items:center; gap:15px;">
+    <div id="ocrStatus" style="color:#fff; font-size:14px; background:rgba(0,0,0,0.5); padding:5px 15px; border-radius:20px;">カメラ起動中...</div>
+    <div class="row" style="gap:20px;">
+      <button class="btn danger" id="ocrCloseBtn" style="padding:12px 24px;">閉じる</button>
+      <button class="btn primary" id="ocrCaptureBtn" style="padding:12px 24px; font-size:16px;">📷 読み取る</button>
+    </div>
+  </div>
+
+  <canvas id="ocrCanvas" style="display:none;"></canvas>
+</div>
+  
   // ========= Zip -> address =========
   async function fetchAddressByZip(zipRaw){
     const zip = (zipRaw || "").replace(/[^\d]/g, "");
