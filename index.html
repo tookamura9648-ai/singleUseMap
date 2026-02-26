@@ -166,6 +166,28 @@
   font-size: 12px;
 }
 
+    #ocrModal {
+  display: none;
+  /* 画面の特定の位置ではなく、画面全体を覆い尽くす設定 */
+  position: fixed; 
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  
+  background: #000;
+  /* 地図やヘッダーよりも絶対上に表示する魔法の数字 */
+  z-index: 99999 !important; 
+  margin: 0;
+  padding: 0;
+}
+
+/* 映像を画面いっぱいに広げる */
+#ocrVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* 隙間なく表示 */
+}
 /* 住所の改行・視認性対策 */
 .card .addr {
   font-size: 13px;
@@ -476,34 +498,35 @@ const ocrStatus = $("ocrStatus");
 // カメラ起動
 async function startOCR() {
   try {
+    // カメラ起動時にスクロールを禁止にする（操作ミス防止）
+    document.body.style.overflow = "hidden";
+    
     ocrStatus.textContent = "カメラ準備中...";
     ocrModal.style.display = "block";
 
-    // 背面カメラを指定して起動
     ocrStream = await navigator.mediaDevices.getUserMedia({
       video: { 
         facingMode: "environment",
         width: { ideal: 1280 },
         height: { ideal: 720 }
-      },
-      audio: false
+      }
     });
     ocrVideo.srcObject = ocrStream;
     ocrStatus.textContent = "枠内に住所を合わせてください";
   } catch (e) {
     console.error(e);
-    toast("カメラの起動に失敗しました。権限を確認してください。");
     stopOCR();
   }
 }
 
-// カメラ停止
 function stopOCR() {
   if (ocrStream) {
     ocrStream.getTracks().forEach(track => track.stop());
     ocrStream = null;
   }
   ocrModal.style.display = "none";
+  // 閉じたらスクロールを元に戻す
+  document.body.style.overflow = "";
 }
 
 // ガイド枠内の画像をキャプチャして解析（Tesseract.jsへの橋渡し）
