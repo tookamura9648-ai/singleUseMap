@@ -395,6 +395,8 @@
     <button class="btn primary" id="ocrCaptureBtn" style="padding: 15px 30px;">📷 読み取る</button>
   </div>
 </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 (() => {
   // ========= Utilities =========
@@ -567,35 +569,62 @@ function stopOCR() {
 }
 
 // ガイド枠内の画像をキャプチャして解析（Tesseract.jsへの橋渡し）
+let ocrWorker = null;
+
 async function captureAddress() {
-  if (!ocrStream) return;
+    if (!ocrStream) return;
 
-  const ctx = ocrCanvas.getContext("2d");
-  
-  // ビデオの実際のサイズと表示サイズの比率を計算
-  const vW = ocrVideo.videoWidth;
-  const vH = ocrVideo.videoHeight;
-  
-  // Canvasサイズをビデオに合わせる
-  ocrCanvas.width = vW;
-  ocrCanvas.height = vH;
-  
-  // 現在のフレームをCanvasに描画
-  ctx.drawImage(ocrVideo, 0, 0, vW, vH);
+    // 1. OCRエンジンの初期化（初回のみ）
+    if (!ocrWorker) {
+        ocrStatus.textContent = "エンジン起動中...";
+        ocrWorker = await Tesseract.createWorker('jpn'); // 日本語
+    }
 
-  // ここで本来はガイド枠の部分だけを切り出す(Crop)処理を入れると精度が上がります
-  // 今回は一旦「撮影成功」のトーストまで
-  if (navigator.vibrate) navigator.vibrate(50); // 成功の振動
-  ocrStatus.textContent = "解析中...";
-  
-  // ここに Tesseract.recognize(...) を呼び出す処理を記述します
-  toast("画像をキャプチャしました。解析を開始します。");
-  
-  // テスト用：3秒後に閉じる
-  setTimeout(() => {
-    ocrStatus.textContent = "枠内に住所を合わせてください";
-    // stopOCR(); // 本来は解析成功後に閉じる
-  }, 3000);
+    const video = $("ocrVideo");
+    const canvas = $("ocrCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // 2. ビデオの解像度と画面上の表示サイズの比率を計算
+    const scale = video.videoWidth / video.offsetWidth;
+    
+    // ガイド枠（scanGuide）の位置とサイズを取得
+    const guide = $("scanGuide");
+    const rect = guide.getBoundingClientRect();
+
+    // 3. 枠内の範囲だけをCanvasに切り出す(Crop)
+    canvas.width = rect.width * scale;
+    canvas.height = rect.height * scale;
+    
+    ctx.drawImage(
+        video, 
+        rect.left * scale, rect.top * scale, rect.width * scale, rect.height * scale, // 元画像（枠内）
+        0, 0, canvas.width, canvas.height // 出力先
+    );
+
+    if (navigator.vibrate) navigator.vibrate(50); // 撮影合図
+    ocrStatus.textContent = "解析中...しばらくお待ちください";
+
+    try {
+        // 4. 解析実行
+        const { data: { text } } = await ocrWorker.recognize(canvas);
+        console.log("読み取り結果:", text);
+
+        // 5. 住所のクリーニング（改行や空白を消す）
+        const cleanedAddress = text.replace(/\s+/g, "");
+
+        if (cleanedAddress.length > 5) {
+            // 住所入力欄にセット
+            $("addr").value = cleanedAddress;
+            toast("住所を入力しました！");
+            stopOCR();
+        } else {
+            ocrStatus.textContent = "文字が見つかりません。もう一度。";
+        }
+    } catch (err) {
+        console.error(err);
+        toast("解析エラーが発生しました");
+        ocrStatus.textContent = "エラーが発生しました";
+    }
 }
 
 // イベント紐付け（DOM読み込み後に実行するように配置してください）
