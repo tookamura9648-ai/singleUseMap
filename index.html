@@ -332,8 +332,7 @@
         </div>
       </div>
 
-      <div id="ocrModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:10000; overflow:hidden;">
-        <video id="ocrVideo" style="width:100%; height:100%; object-fit:cover;" autoplay playsinline></video>
+      
         
         <div id="scanGuide" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:85%; height:80px; border:2px solid #ff6b6b; border-radius:8px; box-shadow:0 0 0 4000px rgba(0,0,0,0.6); pointer-events:none;">
           <div style="position:absolute; top:-25px; left:0; color:#ff6b6b; font-size:12px; font-weight:bold;">ここに住所を合わせる</div>
@@ -369,6 +368,9 @@
       <button class="btn small good" id="confirmAdjustBtn">✅ 確定</button>
     </div>
   </div>
+
+  <div id="ocrModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:10000; overflow:hidden;">
+        <video id="ocrVideo" style="width:100%; height:100%; object-fit:cover;" autoplay playsinline></video>
 
 <script>
 (() => {
@@ -501,23 +503,32 @@ const ocrStatus = $("ocrStatus");
 // カメラ起動
 async function startOCR() {
   try {
-    // カメラ起動時にスクロールを禁止にする（操作ミス防止）
     document.body.style.overflow = "hidden";
-    
-    ocrStatus.textContent = "カメラ準備中...";
     ocrModal.style.display = "block";
 
-    ocrStream = await navigator.mediaDevices.getUserMedia({
+    const constraints = {
       video: { 
         facingMode: "environment",
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      }
-    });
+        // スマホで確実に映るよう、解像度を少し控えめに設定してみる
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      },
+      audio: false
+    };
+
+    ocrStream = await navigator.mediaDevices.getUserMedia(constraints);
+    
+    // 映像をセット
     ocrVideo.srcObject = ocrStream;
+    
+    // iOS/Android対策：確実に再生を開始させる
+    ocrVideo.setAttribute("playsinline", true);
+    await ocrVideo.play();
+    
     ocrStatus.textContent = "枠内に住所を合わせてください";
   } catch (e) {
-    console.error(e);
+    console.error("Camera Error:", e);
+    toast("カメラ映像の表示に失敗しました: " + e.message);
     stopOCR();
   }
 }
