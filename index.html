@@ -644,20 +644,38 @@
       return;
     }
 
-    // 重要：ガイド枠座標は「画面基準」なので、videoの表示領域基準に変換する
     const guide = $("scanGuide");
     const guideRect = guide.getBoundingClientRect();
     const videoRect = video.getBoundingClientRect();
-
-    // video表示サイズ -> 実ピクセルへのスケール
-    const scaleX = video.videoWidth / videoRect.width;
-    const scaleY = video.videoHeight / videoRect.height;
-
-    // 枠の左上を videoRect 基準にする
-    const sx = (guideRect.left - videoRect.left) * scaleX;
-    const sy = (guideRect.top - videoRect.top) * scaleY;
-    const sw = guideRect.width * scaleX;
-    const sh = guideRect.height * scaleY;
+    
+    // 表示上のvideo領域に対して、実際の映像が cover でどれだけはみ出しているかを計算
+    const displayW = videoRect.width;
+    const displayH = videoRect.height;
+    const videoW = video.videoWidth;
+    const videoH = video.videoHeight;
+    
+    // cover: 表示領域を埋めるために拡大される倍率
+    const scale = Math.max(displayW / videoW, displayH / videoH);
+    
+    // cover後の「表示上の映像サイズ」
+    const fittedW = videoW * scale;
+    const fittedH = videoH * scale;
+    
+    // はみ出した分（左右 or 上下のトリミング量）
+    const offsetX = (fittedW - displayW) / 2;
+    const offsetY = (fittedH - displayH) / 2;
+    
+    // ガイド枠を video表示領域基準にする
+    const gx = (guideRect.left - videoRect.left) + offsetX;
+    const gy = (guideRect.top - videoRect.top) + offsetY;
+    const gw = guideRect.width;
+    const gh = guideRect.height;
+    
+    // 実ピクセル座標へ変換
+    const sx = gx / scale;
+    const sy = gy / scale;
+    const sw = gw / scale;
+    const sh = gh / scale;
 
     canvas.width = Math.max(1, Math.floor(sw));
     canvas.height = Math.max(1, Math.floor(sh));
