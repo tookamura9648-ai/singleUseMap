@@ -672,16 +672,20 @@
     const gh = guideRect.height;
     
     // 実ピクセル座標へ変換
-    const sx = gx / scale;
-    const sy = gy / scale;
-    const sw = gw / scale;
-    const sh = gh / scale;
-
-    canvas.width = Math.max(1, Math.floor(sw));
-    canvas.height = Math.max(1, Math.floor(sh));
+    let sx2 = Math.max(0, sx);
+    let sy2 = Math.max(0, sy);
+    let sw2 = Math.min(videoW - sx2, sw);
+    let sh2 = Math.min(videoH - sy2, sh);
     
-    // ① 一旦通常描画（元画像取得）
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    // 万が一、枠が小さすぎる/外れた場合
+    if (sw2 < 10 || sh2 < 10) {
+      ocrStatus.textContent = "枠が映像外です。住所の行に合わせてください。";
+      return;
+    }
+
+    canvas.width = Math.max(1, Math.floor(sw2));
+    canvas.height = Math.max(1, Math.floor(sh2));
+    ctx.drawImage(video, sx2, sy2, sw2, sh2, 0, 0, canvas.width, canvas.height);
     
     // ② 2倍に拡大（←漢字精度アップの核心）
     const tempCanvas = document.createElement("canvas");
