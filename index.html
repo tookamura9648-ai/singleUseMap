@@ -659,11 +659,40 @@
 
     canvas.width = Math.max(1, Math.floor(sw));
     canvas.height = Math.max(1, Math.floor(sh));
-
-    // フィルターをかけてから描画（順序が重要）
-    ctx.filter = "grayscale(1) contrast(2.5) brightness(1.1) saturate(0)";
+    
+    // ① 一旦通常描画（元画像取得）
     ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-    ctx.filter = "none";
+    
+    // ② 2倍に拡大（←漢字精度アップの核心）
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = canvas.width * 2;
+    tempCanvas.height = canvas.height * 2;
+    const tctx = tempCanvas.getContext("2d");
+    
+    tctx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+    
+    // ③ 画像データ取得
+    let imgData = tctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+    let data = imgData.data;
+
+    // ④ 白黒＋超コントラスト化（住所OCR専用）
+    for (let i = 0; i < data.length; i += 4) {
+      let r = data[i];
+      let g = data[i + 1];
+      let b = data[i + 2];
+    
+      let gray = 0.3 * r + 0.59 * g + 0.11 * b;
+      let bw = gray > 160 ? 255 : 0;
+    
+      data[i] = data[i + 1] = data[i + 2] = bw;
+    }
+    
+    tctx.putImageData(imgData, 0, 0);
+    
+    // ⑤ OCR用キャンバスに戻す
+    canvas.width = tempCanvas.width;
+    canvas.height = tempCanvas.height;
+    ctx.drawImage(tempCanvas, 0, 0);
 
     if (navigator.vibrate) navigator.vibrate(50);
     ocrStatus.textContent = "解析中...しばらくお待ちください";
