@@ -591,6 +591,8 @@ async function captureAddress() {
     // 1. OCRエンジンの初期化（初回のみ）
     if (!ocrWorker) {
         ocrStatus.textContent = "エンジン起動中...";
+        ocrworker = await ocrWorker.setParameters({
+          tessedit_char_whitelist: '0123456789-市区町村都道府県丁目番地号号棟一二三四五六七八九十', });
         ocrWorker = await Tesseract.createWorker('jpn'); // 日本語
     }
 
@@ -615,6 +617,11 @@ async function captureAddress() {
         0, 0, canvas.width, canvas.height // 出力先
     );
 
+    ctx.filter = 'grayscale(1) contrast(2) brightness(1.2)';
+    ctx.drawImage(video, rect.left * scale, rect.top * scale, rect.width * scale, rect.height * scale, 0, 0, canvas.width, canvas.height);
+    // フィルターをリセット
+    ctx.filter = 'none';
+  
     if (navigator.vibrate) navigator.vibrate(50); // 撮影合図
     ocrStatus.textContent = "解析中...しばらくお待ちください";
 
