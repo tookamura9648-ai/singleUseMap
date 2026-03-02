@@ -531,129 +531,163 @@
   }
 
   // ========= OCR Logic =========
-let ocrStream = null;
+  let ocrStream = null;
+  let ocrWorker = null;
 
-// モーダルと各要素の取得
-const ocrModal = $("ocrModal");
-const ocrVideo = $("ocrVideo");
-const ocrCanvas = $("ocrCanvas");
-const ocrStatus = $("ocrStatus");
+  // モーダルと各要素の取得
+  const ocrModal = $("ocrModal");
+  const ocrVideo = $("ocrVideo");
+  const ocrCanvas = $("ocrCanvas");
+  const ocrStatus = $("ocrStatus");
 
-// カメラ起動
-async function startOCR() {
-  try {
+  function showOCR(){
     document.body.style.overflow = "hidden";
     ocrModal.style.display = "block";
-
-    const constraints = {
-      video: { 
-        facingMode: "environment",
-        // スマホで確実に映るよう、解像度を少し控えめに設定してみる
-        width: { ideal: 640 },
-        height: { ideal: 480 }
-      },
-      audio: false
-    };
-
-    ocrStream = await navigator.mediaDevices.getUserMedia(constraints);
-    
-    // 映像をセット
-    ocrVideo.srcObject = ocrStream;
-    
-    // iOS/Android対策：確実に再生を開始させる
-    ocrVideo.setAttribute("playsinline", true);
-    await ocrVideo.play();
-    
-    ocrStatus.textContent = "枠内に住所を合わせてください";
-  } catch (e) {
-    console.error("Camera Error:", e);
-    toast("カメラ映像の表示に失敗しました: " + e.message);
-    stopOCR();
   }
-}
-
-function stopOCR() {
-  if (ocrStream) {
-    ocrStream.getTracks().forEach(track => track.stop());
-    ocrStream = null;
+  function hideOCR(){
+    ocrModal.style.display = "none";
+    document.body.style.overflow = "";
   }
-  ocrModal.style.display = "none";
-  // 閉じたらスクロールを元に戻す
-  document.body.style.overflow = "";
-}
 
-// ガイド枠内の画像をキャプチャして解析（Tesseract.jsへの橋渡し）
-let ocrWorker = null;
+  // カメラ起動
+  async function startOCR() {
+    try {
+      showOCR();
+      ocrStatus.textContent = "カメラ起動中...";
 
-async function captureAddress() {
+      const constraints = {
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      };
+
+      ocrStream = await navigator.mediaDevices.getUserMedia(constraints);
+      ocrVideo.srcObject = ocrStream;
+
+      // iOS/Android対策：確実に再生開始
+      ocrVideo.setAttribute("playsinline", "true");
+      await ocrVideo.play();
+
+      ocrStatus.textContent = "枠内に住所を合わせてください";
+    } catch (e) {
+      console.error("Camera Error:", e);
+      toast("カメラの起動に失敗しました: " + (e?.message || e));
+      stopOCR();
+    }
+  }
+
+  function stopOCR() {
+    try{
+      if (ocrStream) {
+        ocrStream.getTracks().forEach(track => track.stop());
+        ocrStream = null;
+      }
+      if(ocrVideo) ocrVideo.srcObject = null;
+    }finally{
+      hideOCR();
+    }
+  }
+
+  // OCR初期化（初回だけ）
+  async function ensureOCRWorker(){
+    if(ocrWorker) return ocrWorker;
+
+    ocrStatus.textContent = "OCRエンジン起動中...";
+    // tesseract.js v5: createWorker(lang) でOK
+    ocrWorker = await Tesseract.createWorker("jpn");
+
+    // 住所向け：数字/ハイフン/住所文字を優先（必要なら足す）
+    await ocrWorker.setParameters({
+      tessedit_char_whitelist: "0123456789-−―ー〒都道府県市区町村郡大字字丁目番地号室階棟一二三四五六七八九十東西南北"
+    });
+
+    return ocrWorker;
+  }
+
+  // ガイド枠内だけをキャプチャして解析
+  async function captureAddress() {
     if (!ocrStream) return;
 
-    // 1. OCRエンジンの初期化（初回のみ）
-    if (!ocrWorker) {
-        ocrStatus.textContent = "エンジン起動中...";
-        ocrworker = await ocrWorker.setParameters({
-          tessedit_char_whitelist: '0123456789-市区町村都道府県丁目番地号号棟一二三四五六七八九十', });
-        ocrWorker = await Tesseract.createWorker('jpn'); // 日本語
+    try{
+      await ensureOCRWorker();
+    }catch(e){
+      console.error(e);
+      toast("OCRエンジンの起動に失敗しました");
+      ocrStatus.textContent = "OCR起動エラー";
+      return;
     }
 
-    const video = $("ocrVideo");
-    const canvas = $("ocrCanvas");
-    const ctx = canvas.getContext("2d");
+    const video = ocrVideo;
+    const canvas = ocrCanvas;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
-    // 2. ビデオの解像度と画面上の表示サイズの比率を計算
-    const scale = video.videoWidth / video.offsetWidth;
-    
-    // ガイド枠（scanGuide）の位置とサイズを取得
+    // 描画準備（動画メタデータ待ち）
+    if(!video.videoWidth || !video.videoHeight){
+      await new Promise(r => setTimeout(r, 250));
+    }
+    if(!video.videoWidth || !video.videoHeight){
+      toast("映像情報が取得できません。もう一度お試しください。");
+      return;
+    }
+
+    // 重要：ガイド枠座標は「画面基準」なので、videoの表示領域基準に変換する
     const guide = $("scanGuide");
-    const rect = guide.getBoundingClientRect();
+    const guideRect = guide.getBoundingClientRect();
+    const videoRect = video.getBoundingClientRect();
 
-    // 3. 枠内の範囲だけをCanvasに切り出す(Crop)
-    canvas.width = rect.width * scale;
-    canvas.height = rect.height * scale;
-    
-    ctx.drawImage(
-        video, 
-        rect.left * scale, rect.top * scale, rect.width * scale, rect.height * scale, // 元画像（枠内）
-        0, 0, canvas.width, canvas.height // 出力先
-    );
+    // video表示サイズ -> 実ピクセルへのスケール
+    const scaleX = video.videoWidth / videoRect.width;
+    const scaleY = video.videoHeight / videoRect.height;
 
-    ctx.filter = 'grayscale(1) contrast(2) brightness(1.2)';
-    ctx.drawImage(video, rect.left * scale, rect.top * scale, rect.width * scale, rect.height * scale, 0, 0, canvas.width, canvas.height);
-    // フィルターをリセット
-    ctx.filter = 'none';
-  
-    if (navigator.vibrate) navigator.vibrate(50); // 撮影合図
-    ocrStatus.textContent = "解析中...しばらくお待ちください";
+    // 枠の左上を videoRect 基準にする
+    const sx = (guideRect.left - videoRect.left) * scaleX;
+    const sy = (guideRect.top - videoRect.top) * scaleY;
+    const sw = guideRect.width * scaleX;
+    const sh = guideRect.height * scaleY;
+
+    canvas.width = Math.max(1, Math.floor(sw));
+    canvas.height = Math.max(1, Math.floor(sh));
+
+    // 先にフィルターをかけてから描画（順序が大事）
+    ctx.filter = "grayscale(1) contrast(2) brightness(1.2)";
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    ctx.filter = "none";
+
+    if (navigator.vibrate) navigator.vibrate(50);
+    ocrStatus.textContent = "解析中...";
 
     try {
-        // 4. 解析実行
-        const { data: { text } } = await ocrWorker.recognize(canvas);
-        console.log("読み取り結果:", text);
+      const { data: { text } } = await ocrWorker.recognize(canvas);
 
-        // 5. 住所のクリーニング（改行や空白を消す）
-        const cleanedAddress = text.replace(/\s+/g, "");
+      // 住所のクリーニング（改行/余計な空白を除去）
+      const cleaned = (text || "")
+        .replace(/\s+/g, "")
+        .replace(/[|｜]+/g, "")
+        .trim();
 
-        if (cleanedAddress.length > 5) {
-            // 住所入力欄にセット
-            $("addr").value = cleanedAddress;
-            toast("住所を入力しました！");
-            stopOCR();
-        } else {
-            ocrStatus.textContent = "文字が見つかりません。もう一度。";
-        }
+      if (cleaned.length >= 6) {
+        $("addr").value = cleaned;
+        toast("住所を入力しました！");
+        stopOCR();
+      } else {
+        ocrStatus.textContent = "文字が見つかりません。枠を近づけて再試行してください。";
+      }
     } catch (err) {
-        console.error(err);
-        toast("解析エラーが発生しました");
-        ocrStatus.textContent = "エラーが発生しました";
+      console.error(err);
+      toast("解析エラーが発生しました");
+      ocrStatus.textContent = "解析エラー";
     }
-}
+  }
 
-// イベント紐付け（DOM読み込み後に実行するように配置してください）
-const ocrOpenBtn = $("ocrOpenBtn");
+  // イベント紐付け
+  const ocrOpenBtn = $("ocrOpenBtn");
   if(ocrOpenBtn) ocrOpenBtn.addEventListener("click", startOCR);
-$("ocrCloseBtn").addEventListener("click", stopOCR);
-$("ocrCaptureBtn").addEventListener("click", captureAddress);
-  
+  $("ocrCloseBtn").addEventListener("click", stopOCR);
+  $("ocrCaptureBtn").addEventListener("click", captureAddress);
+
   // ========= Map =========
   const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12);
   L.control.zoom({ position: "bottomright" }).addTo(map);
