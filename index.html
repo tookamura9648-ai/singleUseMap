@@ -654,33 +654,56 @@
     // 先にフィルターをかけてから描画（順序が大事）
     ctx.filter = "grayscale(1) contrast(2) brightness(1.2)";
     ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-    ctx.filter = "none";
-
-    if (navigator.vibrate) navigator.vibrate(50);
-    ocrStatus.textContent = "解析中...";
-
-    try {
-      const { data: { text } } = await ocrWorker.recognize(canvas);
-
-      // 住所のクリーニング（改行/余計な空白を除去）
-      const cleaned = (text || "")
-        .replace(/\s+/g, "")
-        .replace(/[|｜]+/g, "")
-        .trim();
-
-      if (cleaned.length >= 6) {
-        $("addr").value = cleaned;
-        toast("住所を入力しました！");
-        stopOCR();
-      } else {
-        ocrStatus.textContent = "文字が見つかりません。枠を近づけて再試行してください。";
+      // Canvasサイズを枠（rect）に合わせる
+      canvas.width = rect.width * scale;
+      canvas.height = rect.height * scale;
+      
+      // 1. 強力なフィルタを適用（文字をクッキリさせる）
+      //    grayscale(1): 白黒にする
+      //    contrast(2.5): コントラストを大幅に上げる
+      //    brightness(1.1): 少し明るくして背景のノイズを飛ばす
+      //    saturate(0): 彩度を0にする（白黒のダメ押し）
+      ctx.filter = 'grayscale(1) contrast(2.5) brightness(1.1) saturate(0)';
+      
+      // 2. 枠内の範囲だけをCanvasに描画（Crop）
+      ctx.drawImage(
+          video, 
+          rect.left * scale, rect.top * scale, rect.width * scale, rect.height * scale, // 元画像（枠内）
+          0, 0, canvas.width, canvas.height // 出力先
+      );
+      
+      // 3. フィルタをリセット（重要：次の描画に影響させない）
+      ctx.filter = 'none';
+      
+      if (navigator.vibrate) navigator.vibrate(50); // 撮影合図
+      ocrStatus.textContent = "解析中...しばらくお待ちください";
+          ctx.filter = "none";
+  
+      if (navigator.vibrate) navigator.vibrate(50);
+      ocrStatus.textContent = "解析中...";
+  
+      try {
+        const { data: { text } } = await ocrWorker.recognize(canvas);
+  
+        // 住所のクリーニング（改行/余計な空白を除去）
+        const cleaned = (text || "")
+          .replace(/\s+/g, "")
+          .replace(/[|｜]+/g, "")
+          .trim();
+  
+        if (cleaned.length >= 6) {
+          $("addr").value = cleaned;
+          toast("住所を入力しました！");
+          stopOCR();
+        } else {
+          ocrStatus.textContent = "文字が見つかりません。枠を近づけて再試行してください。";
+        }
+      } catch (err) {
+        console.error(err);
+        toast("解析エラーが発生しました");
+        ocrStatus.textContent = "解析エラー";
       }
-    } catch (err) {
-      console.error(err);
-      toast("解析エラーが発生しました");
-      ocrStatus.textContent = "解析エラー";
     }
-  }
 
   // イベント紐付け
   const ocrOpenBtn = $("ocrOpenBtn");
