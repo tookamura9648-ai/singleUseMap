@@ -602,18 +602,20 @@
 
   // OCR初期化（初回だけ）
   async function ensureOCRWorker(){
-    if(ocrWorker) return ocrWorker;
+  if(ocrWorker) return ocrWorker;
 
-    ocrStatus.textContent = "OCRエンジン起動中...";
-    // tesseract.js v5: createWorker(lang) でOK
-    ocrWorker = await Tesseract.createWorker("jpn");
+  ocrStatus.textContent = "OCRエンジン起動中...";
 
-    // 住所向け：数字/ハイフン/住所文字を優先（必要なら足す）
-    await ocrWorker.setParameters({
-      tessedit_char_whitelist: "0123456789-−―ー〒都道府県市区町村郡大字字丁目番地号室階棟一二三四五六七八九十東西南北"
-    });
+  // 日本語OCR起動
+  ocrWorker = await Tesseract.createWorker("jpn");
 
-    return ocrWorker;
+  // ⭐住所OCR最適設定
+  await ocrWorker.setParameters({
+    tessedit_pageseg_mode: "7",   // ← 1行として読む（住所向け）
+    preserve_interword_spaces: "1"
+  });
+
+  return ocrWorker;
   }
 
   // ガイド枠内だけをキャプチャして解析
@@ -688,6 +690,27 @@
     }
     
     tctx.putImageData(imgData, 0, 0);
+    // ⑥ 文字を太らせる（モルフォロジー膨張）
+    let imgData2 = tctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+    let d = imgData2.data;
+    let w = tempCanvas.width;
+    let h = tempCanvas.height;
+    
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        let i = (y * w + x) * 4;
+        if (d[i] === 0) { // 黒ピクセル
+          // 周囲も黒にする（太字化）
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              let j = ((y + dy) * w + (x + dx)) * 4;
+              d[j] = d[j+1] = d[j+2] = 0;
+            }
+          }
+        }
+      }
+    }
+    tctx.putImageData(imgData2, 0, 0);
     
     // ⑤ OCR用キャンバスに戻す
     canvas.width = tempCanvas.width;
