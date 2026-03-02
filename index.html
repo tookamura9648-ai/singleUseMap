@@ -560,6 +560,8 @@ function hideOCR() {
 
 // カメラ起動
 async function startOCR() {
+  let ocrImageCapture = null;
+  let ocrTrack = null;
   try {
     showOCR();
     ocrStatus.textContent = "カメラ起動中...";
@@ -586,6 +588,9 @@ async function startOCR() {
     toast("カメラの起動に失敗しました: " + (e?.message || e));
     stopOCR();
   }
+  // カメラトラック保存（写真用）
+  ocrTrack = ocrStream.getVideoTracks()[0];
+  ocrImageCapture = new ImageCapture(ocrTrack);
 }
 
 function stopOCR() {
@@ -689,8 +694,18 @@ async function captureAddress() {
   // --- 描画（切り出し） ---
   canvas.width = Math.max(1, Math.floor(sw2));
   canvas.height = Math.max(1, Math.floor(sh2));
-  ctx.drawImage(video, sx2, sy2, sw2, sh2, 0, 0, canvas.width, canvas.height);
-
+  // 📸 静止画撮影
+    let bitmap;
+    try {
+      bitmap = await ocrImageCapture.takePhoto();
+    } catch(e) {
+      toast("写真撮影に失敗しました");
+      return;
+    }
+    
+    // 撮影画像をcanvasへ描画
+    const img = await createImageBitmap(bitmap);
+    ctx.drawImage(img, sx2, sy2, sw2, sh2, 0, 0, canvas.width, canvas.height);
   // --- 2倍拡大（漢字に効く） ---
   const tempCanvas = document.createElement("canvas");
   tempCanvas.width = canvas.width * 2;
