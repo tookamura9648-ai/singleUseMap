@@ -791,7 +791,23 @@ async function captureAddress() {
 
   if (navigator.vibrate) navigator.vibrate(50);
   ocrStatus.textContent = "解析中...しばらくお待ちください";
-
+  
+  // ==== DEBUG: OCRに渡す画像を表示 ====
+    let dbg = document.getElementById("ocrDebugImg");
+    if (!dbg) {
+      dbg = document.createElement("img");
+      dbg.id = "ocrDebugImg";
+      dbg.style.position = "fixed";
+      dbg.style.right = "10px";
+      dbg.style.top = "10px";
+      dbg.style.width = "180px";
+      dbg.style.border = "2px solid #f55";
+      dbg.style.zIndex = "999999"; // ← モーダルより前に出す
+      dbg.style.background = "#000";
+      document.body.appendChild(dbg);
+    }
+    dbg.src = canvas.toDataURL("image/png");
+  
   try {
     const result = await ocrWorker.recognize(canvas);
     const rawText = result?.data?.text || "";
