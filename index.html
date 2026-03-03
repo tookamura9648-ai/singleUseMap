@@ -626,15 +626,18 @@ async function startOCR() {
   }
 }
 
-function stopOCR() {
-  try {
-    if (ocrStream) {
-      ocrStream.getTracks().forEach(t => t.stop());
-      ocrStream = null;
+function stopOCR(){
+  try{
+    if(ocrStream){
+      ocrStream.getTracks().forEach(t=>t.stop());
+      ocrStream=null;
     }
-    if (ocrVideo) ocrVideo.srcObject = null;
-  } finally {
+    if(ocrVideo) ocrVideo.srcObject=null;
+    ocrTrack = null;
+    ocrImageCapture = null;
+  }finally{
     hideOCR();
+    ocrStarting = false;
   }
 }
 
