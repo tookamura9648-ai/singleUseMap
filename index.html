@@ -749,7 +749,7 @@ async function captureAddress() {
   let imgData = tctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
   let data = imgData.data;
 
-  const THRESH = 125; // ← ここを 135〜165で微調整すると効きます
+  const THRESH = 160; // ← ここを 135〜165で微調整すると効きます
 
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i], g = data[i + 1], b = data[i + 2];
