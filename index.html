@@ -826,6 +826,12 @@ async function captureAddress() {
     toast("解析エラーが発生しました");
     ocrStatus.textContent = "解析エラー";
   }
+  document.body.appendChild(canvas);
+  canvas.style.position = "fixed";
+  canvas.style.bottom = "10px";
+  canvas.style.right = "10px";
+  canvas.style.width = "200px";
+  canvas.style.border = "2px solid red";
 }
 
 // イベント紐付け
