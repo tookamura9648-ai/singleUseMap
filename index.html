@@ -542,6 +542,9 @@
   // ========= OCR Logic =========
 let ocrStream = null;
 let ocrWorker = null;
+let ocrTrack = null;
+let ocrImageCapture = null;
+let ocrStarting = false;
 
 // モーダルと各要素の取得
 const ocrModal  = $("ocrModal");
@@ -560,17 +563,19 @@ function hideOCR() {
 
 // カメラ起動
 async function startOCR() {
-  let ocrImageCapture = null;
-  let ocrTrack = null;
+  if (ocrStarting) return; // 多重起動防止
+  ocrStarting = true;
+
   try {
     showOCR();
     ocrStatus.textContent = "カメラ起動中...";
 
+    // 1) カメラ起動
     const constraints = {
       video: {
         facingMode: { ideal: "environment" },
-        width:  { ideal: 1280 },
-        height: { ideal: 720 }
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 }
       },
       audio: false
     };
@@ -578,19 +583,47 @@ async function startOCR() {
     ocrStream = await navigator.mediaDevices.getUserMedia(constraints);
     ocrVideo.srcObject = ocrStream;
 
-    // iOS/Android対策：確実に再生開始
+    // iOS/Android 対策
     ocrVideo.setAttribute("playsinline", "true");
+    ocrVideo.muted = true;
+
+    // videoの再生開始（待つ）
     await ocrVideo.play();
 
-    ocrStatus.textContent = "枠内に住所を合わせてください";
+    // 2) 写真撮影用（対応端末のみ）
+    try {
+      ocrTrack = ocrStream.getVideoTracks()[0];
+      if (window.ImageCapture && ocrTrack) {
+        ocrImageCapture = new ImageCapture(ocrTrack);
+      } else {
+        ocrImageCapture = null;
+      }
+    } catch (e) {
+      ocrImageCapture = null;
+    }
+
+    // 3) OCRワーカー初期化（重いので UI を更新しながら）
+    ocrStatus.textContent = "OCRエンジン起動中...（初回は少し時間がかかります）";
+
+    // タイムアウト（20秒）を用意：固まって見えるのを防ぐ
+    const timeoutMs = 20000;
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("OCR起動がタイムアウトしました")), timeoutMs)
+    );
+
+    // ensureOCRWorker() はあなたの関数（createWorker含む）
+    await Promise.race([ensureOCRWorker(), timeoutPromise]);
+
+    // 4) 準備完了
+    ocrStatus.textContent = "枠内に住所を合わせて『読み取る』を押してください";
+
   } catch (e) {
-    console.error("Camera Error:", e);
-    toast("カメラの起動に失敗しました: " + (e?.message || e));
+    console.error("startOCR error:", e);
+    toast("起動に失敗しました: " + (e?.message || e));
     stopOCR();
+  } finally {
+    ocrStarting = false;
   }
-  // カメラトラック保存（写真用）
-  ocrTrack = ocrStream.getVideoTracks()[0];
-  ocrImageCapture = new ImageCapture(ocrTrack);
 }
 
 function stopOCR() {
