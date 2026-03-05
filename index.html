@@ -765,216 +765,133 @@ async function pickBestCandidateByGeocode(candidates){
 
 // ガイド枠内だけをキャプチャして解析
 async function captureAddress() {
-  if (!ocrStream) return;
 
-  try {
-    await ensureOCRWorker();
-  } catch (e) {
-    console.error(e);
-    toast("OCRエンジンの起動に失敗しました");
-    ocrStatus.textContent = "OCR起動エラー";
-    return;
-  }
-
-  const video = ocrVideo;
-  const canvas = ocrCanvas;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-  // 動画メタデータ待ち
-  if (!video.videoWidth || !video.videoHeight) {
-    await new Promise(r => setTimeout(r, 250));
-  }
-  if (!video.videoWidth || !video.videoHeight) {
-    toast("映像情報が取得できません。もう一度お試しください。");
-    return;
-  }
-
+  const video = $("ocrVideo");
   const guide = $("scanGuide");
-  const guideRect = guide.getBoundingClientRect();
-  const videoRect = video.getBoundingClientRect();
+  const canvas = $("ocrCanvas");
+  const ctx = canvas.getContext("2d",{willReadFrequently:true});
 
-  // --- object-fit: contain のズレ補正 ---
-  // CSSで #ocrVideo { object-fit: contain; } のため、黒帯(padding)を考慮する
+  const videoRect = video.getBoundingClientRect();
+  const guideRect = guide.getBoundingClientRect();
+
   const displayW = videoRect.width;
   const displayH = videoRect.height;
+
   const videoW = video.videoWidth;
   const videoH = video.videoHeight;
 
-  const scale = Math.min(displayW / videoW, displayH / videoH);
-  const fittedW = videoW * scale;
-  const fittedH = videoH * scale;
-  const padX = (displayW - fittedW) / 2;
-  const padY = (displayH - fittedH) / 2;
-
-  const gxDisp = (guideRect.left - videoRect.left);
-  const gyDisp = (guideRect.top  - videoRect.top);
-  const gwDisp = guideRect.width;
-  const ghDisp = guideRect.height;
-
-  // 枠が黒帯にかかっていると、文字がない領域を切る → 先に弾く
-  if (
-    gxDisp < padX || gyDisp < padY ||
-    gxDisp + gwDisp > padX + fittedW ||
-    gyDisp + ghDisp > padY + fittedH
-  ){
-    ocrStatus.textContent = "枠が映像外（黒帯）です。枠を文字に合わせてください。";
+  if(!videoW || !videoH){
+    toast("カメラ準備中");
     return;
   }
 
-  // fitted領域内(表示座標) → 元映像(videoW/H)座標へ
-  let sx = (gxDisp - padX) / scale;
-  let sy = (gyDisp - padY) / scale;
-  let sw = gwDisp / scale;
-  let sh = ghDisp / scale;
+  // contain補正
+  const scale = Math.min(displayW/videoW,displayH/videoH);
 
-  // clamp
-  sx = Math.max(0, sx);
-  sy = Math.max(0, sy);
-  sw = Math.min(videoW - sx, sw);
-  sh = Math.min(videoH - sy, sh);
+  const fittedW = videoW*scale;
+  const fittedH = videoH*scale;
 
-  if (sw < 20 || sh < 20) {
-    ocrStatus.textContent = "枠が小さすぎます。もう少し近づけてください。";
+  const padX = (displayW-fittedW)/2;
+  const padY = (displayH-fittedH)/2;
+
+  const gx = guideRect.left-videoRect.left;
+  const gy = guideRect.top-videoRect.top;
+
+  let sx = (gx-padX)/scale;
+  let sy = (gy-padY)/scale;
+  let sw = guideRect.width/scale;
+  let sh = guideRect.height/scale;
+
+  sx=Math.max(0,sx);
+  sy=Math.max(0,sy);
+
+  sw=Math.min(videoW-sx,sw);
+  sh=Math.min(videoH-sy,sh);
+
+  if(sw<20 || sh<20){
+    toast("枠が小さいです");
     return;
   }
 
-  // --- 静止画を用意（対応端末は takePhoto、非対応は video から drawImage） ---
-  let srcImage = null;
-  let srcW = videoW;
-  let srcH = videoH;
+  // videoフレーム取得
+  const frameCanvas=document.createElement("canvas");
+  frameCanvas.width=videoW;
+  frameCanvas.height=videoH;
 
-  if (ocrImageCapture && typeof ocrImageCapture.takePhoto === "function") {
-    try {
-      const blob = await ocrImageCapture.takePhoto();
-      srcImage = await createImageBitmap(blob);
-      srcW = srcImage.width;
-      srcH = srcImage.height;
-    } catch (e) {
-      // takePhoto が失敗する端末があるのでフォールバック
-      srcImage = null;
+  const fctx=frameCanvas.getContext("2d",{willReadFrequently:true});
+  fctx.drawImage(video,0,0,videoW,videoH);
+
+  // 切り出し
+  canvas.width=Math.floor(sw);
+  canvas.height=Math.floor(sh);
+
+  ctx.drawImage(frameCanvas,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+
+  // OCR前処理（超重要）
+  preprocessOCR(canvas);
+
+  try{
+
+    const result=await ocrWorker.recognize(canvas);
+    const raw=result?.data?.text||"";
+
+    const lines=raw.split("\n").map(s=>s.trim()).filter(Boolean);
+
+    const candidates=makeAddressCandidates(lines);
+
+    if(!candidates.length){
+      toast("住所が見つかりません");
+      return;
     }
-  }
 
-  // --- 描画（切り出し） ---
-  // takePhotoの実サイズが videoW/H と異なる場合に備えて倍率換算
-  const fx = srcImage ? (srcW / videoW) : 1;
-  const fy = srcImage ? (srcH / videoH) : 1;
-  const sxp = sx * fx;
-  const syp = sy * fy;
-  const swp = sw * fx;
-  const shp = sh * fy;
+    let best=candidates[0];
 
-  canvas.width = Math.max(1, Math.floor(swp));
-  canvas.height = Math.max(1, Math.floor(shp));
-
-  if (srcImage) {
-    ctx.drawImage(srcImage, sxp, syp, swp, shp, 0, 0, canvas.width, canvas.height);
-  } else {
-    // フォールバック：現在フレームから切り出し（videoW/Hに一致）
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-  }
-  // --- 2倍拡大（漢字に効く） ---
-  const tempCanvas = document.createElement("canvas");
-  tempCanvas.width = canvas.width * 2;
-  tempCanvas.height = canvas.height * 2;
-  const tctx = tempCanvas.getContext("2d", { willReadFrequently: true });
-  tctx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
-
-  // --- 二値化（薄い印字向けにしきい値を少し低め） ---
-  let imgData = tctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-  let data = imgData.data;
-
-  const THRESH = 160; // ← ここを 135〜165で微調整すると効きます
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i], g = data[i + 1], b = data[i + 2];
-    const gray = 0.3 * r + 0.59 * g + 0.11 * b;
-    const bw = gray > THRESH ? 255 : 0;
-    data[i] = data[i + 1] = data[i + 2] = bw;
-  }
-  tctx.putImageData(imgData, 0, 0);
-
-  // --- 太字化（膨張）: 細い漢字を拾いやすくする ---
-  let imgData2 = tctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-  let d = imgData2.data;
-  let w = tempCanvas.width;
-  let h = tempCanvas.height;
-
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const i = (y * w + x) * 4;
-      if (d[i] === 0) { // 黒
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const j = ((y + dy) * w + (x + dx)) * 4;
-            d[j] = d[j + 1] = d[j + 2] = 0;
-          }
-        }
+    // ジオコーディングで正しい住所を選ぶ
+    for(const c of candidates){
+      const geo=await tryGeocode(c);
+      if(geo){
+        best=c;
+        break;
       }
     }
+
+    const addr=normalizeAddress(best);
+
+    $("addr").value=addr;
+
+    toast("住所を入力しました");
+
+    stopOCR();
+
+  }catch(e){
+    console.error(e);
+    toast("OCRエラー");
   }
-  tctx.putImageData(imgData2, 0, 0);
-
-  // OCR用キャンバスに戻す
-  canvas.width = tempCanvas.width;
-  canvas.height = tempCanvas.height;
-  ctx.drawImage(tempCanvas, 0, 0);
-
-  if (navigator.vibrate) navigator.vibrate(50);
-  ocrStatus.textContent = "解析中...しばらくお待ちください";
-  
-  // ==== DEBUG: OCRに渡す画像を表示 ====
-    let dbg = document.getElementById("ocrDebugImg");
-    if (!dbg) {
-      dbg = document.createElement("img");
-      dbg.id = "ocrDebugImg";
-      dbg.style.position = "fixed";
-      dbg.style.right = "10px";
-      dbg.style.top = "10px";
-      dbg.style.width = "180px";
-      dbg.style.border = "2px solid #f55";
-      dbg.style.zIndex = "999999"; // ← モーダルより前に出す
-      dbg.style.background = "#000";
-      document.body.appendChild(dbg);
-    }
-    dbg.src = canvas.toDataURL("image/png");
-  
-  try {
-    const result = await ocrWorker.recognize(canvas);
-    const rawText = result?.data?.text || "";
-
-    const lines = rawText
-      .split("\n")
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    // 固定レイアウトでない前提：候補を複数作る → geocodeで座標が取れた候補を自動採用
-const candidates = makeAddrCandidates(lines);
-
-// ※ geocode はネットワーク依存なので、待ちすぎないよう短いタイムアウトで試す
-ocrStatus.textContent = "住所候補を確認中...";
-const best = await pickBestCandidateByGeocode(candidates);
-
-const picked = best.text || normalizeAddrText(lines.join(""));
-
-if (picked.length >= 8) {
-  $("addr").value = picked;
-
-  // 座標が取れた場合は、ピン記憶にも効くので軽く保存（既存ロジックに任せる）
-  if(best.geo && isValidLatLng(Number(best.geo.lat), Number(best.geo.lng))){
-    // geocodeWithFallback 内でキャッシュ保存されるのでここでは何もしない
-  }
-
-  toast(best.reason === "geocode_ok" ? "住所を入力しました！（地図確認OK）" : "住所を入力しました！");
-  stopOCR();
-} else {
-  ocrStatus.textContent = "住所が見つかりません。枠を近づけて再試行してください。";
 }
-  } catch (err) {
-    console.error(err);
-    toast("解析エラーが発生しました");
-    ocrStatus.textContent = "解析エラー";
+  function preprocessOCR(canvas){
+
+  const ctx=canvas.getContext("2d",{willReadFrequently:true});
+
+  const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+  const d=img.data;
+
+  for(let i=0;i<d.length;i+=4){
+
+    let gray=
+      d[i]*0.299+
+      d[i+1]*0.587+
+      d[i+2]*0.114;
+
+    gray=(gray-128)*1.4+128;
+
+    const v=gray<140?0:255;
+
+    d[i]=v;
+    d[i+1]=v;
+    d[i+2]=v;
   }
+
+  ctx.putImageData(img,0,0);
 }
 
 // イベント紐付け
