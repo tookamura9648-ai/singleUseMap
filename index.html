@@ -763,7 +763,6 @@ async function pickBestCandidateByGeocode(candidates){
   return { text: cands[0].text, geo: null, reason: "geocode_failed" };
 }
 
-// ガイド枠内だけをキャプチャして解析
 async function captureAddress() {
 
   const video = $("ocrVideo");
@@ -868,13 +867,11 @@ async function captureAddress() {
     toast("OCRエラー");
   }
 }
-  
-
-// イベント紐付け
-const ocrOpenBtn = $("ocrOpenBtn");
-if (ocrOpenBtn) ocrOpenBtn.addEventListener("click", startOCR);
-$("ocrCloseBtn").addEventListener("click", stopOCR);
-$("ocrCaptureBtn").addEventListener("click", captureAddress);
+  // イベント紐付け 
+  const ocrOpenBtn = $("ocrOpenBtn"); 
+  if (ocrOpenBtn) ocrOpenBtn.addEventListener("click", startOCR); 
+  $("ocrCloseBtn").addEventListener("click", stopOCR); 
+  $("ocrCaptureBtn").addEventListener("click", captureAddress);
 
   // ========= Map =========
   const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12);
