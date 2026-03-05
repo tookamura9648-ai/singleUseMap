@@ -1544,13 +1544,27 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
   }
 
   function setDone(id){
-    const s = stops.find(x => x.id === id);
-    if(!s) return;
-    s.status = (s.status === "done") ? "pending" : "done";
-    save();
-    redrawMarkers();
-    renderList();
+  const s = stops.find(x => x.id === id);
+  if(!s) return;
+
+  s.status = (s.status === "done") ? "pending" : "done";
+
+  save();
+  redrawMarkers();
+  renderList();
+
+  // 次の目的地を自動ナビ
+  if(s.status === "done"){
+    const next = stops.find(x => x.status === "pending");
+
+    if(next){
+      toast("次の目的地へナビ開始");
+      openNav(next.id);
+    }else{
+      toast("すべて完了しました 🎉");
+    }
   }
+}
 
   function openNav(id){
     const s = stops.find(x => x.id === id);
