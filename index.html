@@ -568,17 +568,43 @@ async function startOCR() {
 
     // 1) カメラ起動
     const constraints = {
-      video: {
-        facingMode: { ideal: "environment" },
-        width:  { ideal: 1920 },
-        height: { ideal: 1080 }
-      },
-      audio: false
-    };
+  video: {
+    facingMode: { ideal: "environment" },
+
+    // 解像度を高く
+    width:  { ideal: 1920 },
+    height: { ideal: 1080 },
+
+    // ピント自動調整
+    focusMode: "continuous",
+
+    // 明るさ自動
+    exposureMode: "continuous",
+
+    // ホワイトバランス
+    whiteBalanceMode: "continuous"
+  },
+  audio: false
+};
 
     ocrStream = await navigator.mediaDevices.getUserMedia(constraints);
     ocrVideo.srcObject = ocrStream;
-
+    
+    // ★ここに追加
+    const track = ocrStream.getVideoTracks()[0];
+    const cap = track.getCapabilities();
+    
+    if (cap.zoom) {
+      track.applyConstraints({
+        advanced: [{ zoom: 2.0 }]
+      });
+    }
+    
+    if (cap.focusMode) {
+      track.applyConstraints({
+        advanced: [{ focusMode: "continuous" }]
+      });
+    }
     // iOS/Android 対策
     ocrVideo.setAttribute("playsinline", "true");
     ocrVideo.muted = true;
