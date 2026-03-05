@@ -868,31 +868,7 @@ async function captureAddress() {
     toast("OCRエラー");
   }
 }
-  function preprocessOCR(canvas){
-
-  const ctx=canvas.getContext("2d",{willReadFrequently:true});
-
-  const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-  const d=img.data;
-
-  for(let i=0;i<d.length;i+=4){
-
-    let gray=
-      d[i]*0.299+
-      d[i+1]*0.587+
-      d[i+2]*0.114;
-
-    gray=(gray-128)*1.4+128;
-
-    const v=gray<140?0:255;
-
-    d[i]=v;
-    d[i+1]=v;
-    d[i+2]=v;
-  }
-
-  ctx.putImageData(img,0,0);
-}
+  
 
 // イベント紐付け
 const ocrOpenBtn = $("ocrOpenBtn");
