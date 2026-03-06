@@ -184,9 +184,12 @@
 }
 
 #ocrVideo{
-  object-fit: contain;   /* ← cover から変更 */
+  width: 100%;
+  height: 100%;
+  object-fit: contain;   /* coverからcontainに変更（黒帯を許容して歪みを防ぐ） */
   background:#000;       /* 余白を黒に */
-}    
+  display: block;
+}
 
 #scanGuide{
   position:absolute;
@@ -317,7 +320,6 @@
     }
   </style>
 </head>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <body>
   <header>
     <div class="title">個別Navigation</div>
@@ -415,9 +417,16 @@
     <canvas id="ocrCanvas" style="display:none;"></canvas>
   </div>
 
-  
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 (() => {
+  // ========= ★ API Key 設定 =========
+  // Google Cloud Vision API を使う場合はここにキーを入力
+  // 空文字列のままにすると Tesseract のみで動作
+  // 注意：本番運用では APIキーをフロントエンドに直接書くのは避け、
+  //       Vercel等のサーバーサイド経由（/api/vision）で呼ぶことを推奨
+  const GOOGLE_VISION_API_KEY = "";  // ← ここにキーを入力
+
   // ========= Utilities =========
   const $ = (id) => document.getElementById(id);
   const toastEl = $("toast");
@@ -590,9 +599,9 @@ async function startOCR() {
     ocrStream = await navigator.mediaDevices.getUserMedia(constraints);
     ocrVideo.srcObject = ocrStream;
     
-    // ★ここに追加
+    // トラック取得（1回だけ）
     const track = ocrStream.getVideoTracks()[0];
-    const cap = track.getCapabilities();
+    const cap = track.getCapabilities ? track.getCapabilities() : {};
     
     if (cap.zoom) {
       track.applyConstraints({
@@ -614,7 +623,7 @@ async function startOCR() {
 
     // 2) 写真撮影用（対応端末のみ）
     try {
-      ocrTrack = ocrStream.getVideoTracks()[0];
+      ocrTrack = track; // 上で取得済みのtrackを再利用
       if (window.ImageCapture && ocrTrack) {
         ocrImageCapture = new ImageCapture(ocrTrack);
       } else {
@@ -923,23 +932,8 @@ async function captureAddress() {
   if (navigator.vibrate) navigator.vibrate(50);
   ocrStatus.textContent = "解析中...しばらくお待ちください";
   
-  // ==== DEBUG: OCRに渡す画像を表示 ====
-    let dbg = document.getElementById("ocrDebugImg");
-    if (!dbg) {
-      dbg = document.createElement("img");
-      dbg.id = "ocrDebugImg";
-      dbg.style.position = "fixed";
-      dbg.style.right = "10px";
-      dbg.style.top = "10px";
-      dbg.style.width = "180px";
-      dbg.style.border = "2px solid #f55";
-      dbg.style.zIndex = "999999"; // ← モーダルより前に出す
-      dbg.style.background = "#000";
-      document.body.appendChild(dbg);
-    }
-    dbg.src = canvas.toDataURL("image/png");
-  
   try {
+    // ===== Step 1: Tesseract OCR =====
     const result = await ocrWorker.recognize(canvas);
     const rawText = result?.data?.text || "";
 
@@ -948,28 +942,71 @@ async function captureAddress() {
       .map(s => s.trim())
       .filter(Boolean);
 
-    // 固定レイアウトでない前提：候補を複数作る → geocodeで座標が取れた候補を自動採用
-const candidates = makeAddrCandidates(lines);
+    const candidates = makeAddrCandidates(lines);
+    ocrStatus.textContent = "住所候補を確認中...";
+    const best = await pickBestCandidateByGeocode(candidates);
+    const picked = best.text || normalizeAddrText(lines.join(""));
 
-// ※ geocode はネットワーク依存なので、待ちすぎないよう短いタイムアウトで試す
-ocrStatus.textContent = "住所候補を確認中...";
-const best = await pickBestCandidateByGeocode(candidates);
+    if (picked.length >= 8 && best.reason === "geocode_ok") {
+      // Tesseractで座標まで確認できた → そのまま採用
+      $("addr").value = picked;
+      toast("住所を入力しました！（地図確認OK）");
+      stopOCR();
+      return;
+    }
 
-const picked = best.text || normalizeAddrText(lines.join(""));
+    // ===== Step 2: Google Cloud Vision API フォールバック =====
+    // Tesseractで住所が取れなかった/座標が確認できなかった場合にVision APIを試みる
+    const visionKey = typeof GOOGLE_VISION_API_KEY !== "undefined" ? GOOGLE_VISION_API_KEY : null;
+    if (visionKey) {
+      ocrStatus.textContent = "Vision APIで再解析中...";
+      try {
+        const imageBase64 = canvas.toDataURL("image/png").split(",")[1];
+        const visionRes = await fetch(
+          `https://vision.googleapis.com/v1/images:annotate?key=${visionKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              requests: [{
+                image: { content: imageBase64 },
+                features: [{ type: "TEXT_DETECTION", maxResults: 1 }],
+                imageContext: { languageHints: ["ja"] }
+              }]
+            })
+          }
+        );
+        if (visionRes.ok) {
+          const visionData = await visionRes.json();
+          const fullText = visionData?.responses?.[0]?.fullTextAnnotation?.text || "";
+          const vLines = fullText.split("\n").map(s => s.trim()).filter(Boolean);
+          const vCandidates = makeAddrCandidates(vLines);
+          ocrStatus.textContent = "Vision API結果を確認中...";
+          const vBest = await pickBestCandidateByGeocode(vCandidates);
+          const vPicked = vBest.text || normalizeAddrText(vLines.join(""));
+          if (vPicked.length >= 8) {
+            $("addr").value = vPicked;
+            toast(vBest.reason === "geocode_ok"
+              ? "住所を入力しました！（Vision API・地図確認OK）"
+              : "住所を入力しました！（Vision API）確認してください");
+            stopOCR();
+            return;
+          }
+        }
+      } catch (vErr) {
+        console.warn("Vision API fallback failed:", vErr);
+        // Vision APIが失敗してもTesseract結果で続行
+      }
+    }
 
-if (picked.length >= 8) {
-  $("addr").value = picked;
-
-  // 座標が取れた場合は、ピン記憶にも効くので軽く保存（既存ロジックに任せる）
-  if(best.geo && isValidLatLng(Number(best.geo.lat), Number(best.geo.lng))){
-    // geocodeWithFallback 内でキャッシュ保存されるのでここでは何もしない
-  }
-
-  toast(best.reason === "geocode_ok" ? "住所を入力しました！（地図確認OK）" : "住所を入力しました！");
-  stopOCR();
-} else {
-  ocrStatus.textContent = "住所が見つかりません。枠を近づけて再試行してください。";
-}
+    // ===== Step 3: Tesseractの結果をそのまま使う（最終フォールバック） =====
+    if (picked.length >= 8) {
+      $("addr").value = picked;
+      toast("住所を入力しました！確認してください");
+      stopOCR();
+    } else {
+      ocrStatus.textContent = "住所が見つかりません。枠を近づけて再試行してください。";
+    }
   } catch (err) {
     console.error(err);
     toast("解析エラーが発生しました");
@@ -977,17 +1014,11 @@ if (picked.length >= 8) {
   }
 }
 
-// イベント紐付け（安全版：DOMが無い/読み込み前でも落ちない）
-window.addEventListener("DOMContentLoaded", () => {
-  const ocrOpenBtn = $("ocrOpenBtn");
-  if (ocrOpenBtn) ocrOpenBtn.addEventListener("click", startOCR);
-
-  const ocrCloseBtn = $("ocrCloseBtn");
-  if (ocrCloseBtn) ocrCloseBtn.addEventListener("click", stopOCR);
-
-  const ocrCaptureBtn = $("ocrCaptureBtn");
-  if (ocrCaptureBtn) ocrCaptureBtn.addEventListener("click", captureAddress);
-});
+// イベント紐付け（スクリプトは body 末尾のため DOM は確実に存在する）
+const ocrOpenBtn = $("ocrOpenBtn");
+if (ocrOpenBtn) ocrOpenBtn.addEventListener("click", startOCR);
+$("ocrCloseBtn").addEventListener("click", stopOCR);
+$("ocrCaptureBtn").addEventListener("click", captureAddress);
 // ========= Map =========
   const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12);
   L.control.zoom({ position: "bottomright" }).addTo(map);
