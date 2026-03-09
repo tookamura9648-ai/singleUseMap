@@ -454,7 +454,15 @@
   let routeLine = null;      // 未完了ルート線（直線）
   let predictMarker = null;  // 推測位置
   let routePtsCache = [];    // ルート線の座標配列（スナップ用）
+  let roadRouteLine = null;
 
+  const ARRIVE_RADIUS_M = 60;
+  const ARRIVE_HOLD_MS = 4000;
+  const ARRIVE_MAX_ACC_M = 80;
+  let arriveInsideSince = 0;
+  let lastAutoDoneAt = 0;
+  const AUTO_DONE_COOLDOWN_MS = 12000;
+  
   // GPS watch / loss detect
   let watchId = null;
   let lastFixAt = 0;
@@ -1448,14 +1456,16 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     routeLine = L.polyline(pts, { weight: 4, opacity: 0.9 }).addTo(map);
   }
 
-  function redrawMarkers(){
+    function redrawMarkers(){
     markersLayer.clearLayers();
+
     stops.forEach((s, i) => {
       L.marker([s.lat, s.lng], { icon: iconForStop(i, s.status) })
         .addTo(markersLayer)
         .bindPopup(`<b>${esc(s.name || "（名称なし）")}</b><br>${esc(s.address)}`);
     });
-    drawRouteLine();
+
+    drawRoadRouteLine();
   }
 
   function renderList(){
@@ -1487,6 +1497,223 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     });
 
     updatePills();
+  }
+
+    function getNextPendingStop(){
+    return stops.find(s => s.status === "pending") || null;
+  }
+
+  function buildCoordsForOSRM(startLatLng, pendingStops){
+    const pts = [
+      { lat: startLatLng.lat, lng: startLatLng.lng },
+      ...pendingStops.map(s => ({ lat: s.lat, lng: s.lng }))
+    ];
+    return pts.map(p => `${p.lng},${p.lat}`).join(";");
+  }
+
+  async function fetchDurationMatrix(coordsStr){
+    const r = await fetch("/api/table?coords=" + encodeURIComponent(coordsStr));
+    const data = await r.json();
+    const d = data?.durations;
+    if(!Array.isArray(d) || !Array.isArray(d[0])) return null;
+    return d;
+  }
+
+  function routeCost(order, D){
+    let sum = 0;
+    for(let i=0;i<order.length-1;i++){
+      const a = order[i], b = order[i+1];
+      const v = D[a]?.[b];
+      if(!(typeof v === "number" && isFinite(v))) return Infinity;
+      sum += v;
+    }
+    return sum;
+  }
+
+  function nearestNeighborPath(D){
+    const n = D.length;
+    const used = new Array(n).fill(false);
+    const path = [0];
+    used[0] = true;
+
+    for(let step=1; step<n; step++){
+      const last = path[path.length-1];
+      let best = -1;
+      let bestV = Infinity;
+
+      for(let j=1; j<n; j++){
+        if(used[j]) continue;
+        const v = D[last]?.[j];
+        if(typeof v !== "number" || !isFinite(v)) continue;
+        if(v < bestV){
+          bestV = v;
+          best = j;
+        }
+      }
+
+      if(best === -1){
+        for(let j=1; j<n; j++){
+          if(!used[j]){
+            best = j;
+            break;
+          }
+        }
+      }
+
+      used[best] = true;
+      path.push(best);
+    }
+
+    return path;
+  }
+
+  function twoOptOpenPath(path, D, maxIters=1200){
+    const n = path.length;
+    if(n < 4) return path;
+
+    let bestPath = path.slice();
+    let bestCost = routeCost(bestPath, D);
+    let iter = 0;
+    let improved = true;
+
+    while(improved && iter < maxIters){
+      improved = false;
+      iter++;
+
+      for(let i=1; i<n-2; i++){
+        for(let k=i+1; k<n-1; k++){
+          const newPath = bestPath.slice();
+          for(let a=i, b=k; a<b; a++, b--){
+            const tmp = newPath[a];
+            newPath[a] = newPath[b];
+            newPath[b] = tmp;
+          }
+
+          const c = routeCost(newPath, D);
+          if(c < bestCost){
+            bestCost = c;
+            bestPath = newPath;
+            improved = true;
+          }
+        }
+      }
+    }
+
+    return bestPath;
+  }
+
+  async function drawRoadRouteLine(){
+    const pending = stops.filter(s => s.status === "pending");
+
+    if(roadRouteLine){
+      map.removeLayer(roadRouteLine);
+      roadRouteLine = null;
+    }
+
+    if(pending.length < 2) return;
+
+    try{
+      const coords = pending.map(s => `${s.lng},${s.lat}`).join(";");
+      const r = await fetch("/api/route?coords=" + encodeURIComponent(coords));
+      const data = await r.json();
+
+      const coordsArr = data?.routes?.[0]?.geometry?.coordinates;
+      if(!Array.isArray(coordsArr) || coordsArr.length < 2){
+        return;
+      }
+
+      const latlngs = coordsArr.map(([lng, lat]) => [lat, lng]);
+      roadRouteLine = L.polyline(latlngs, {
+        weight: 5,
+        opacity: 0.95
+      }).addTo(map);
+    }catch(e){
+      console.warn("drawRoadRouteLine failed", e);
+    }
+  }
+
+  async function optimizeOrderRoad(){
+    const pending = stops.filter(s => s.status === "pending");
+    const done = stops.filter(s => s.status === "done");
+
+    if(pending.length <= 1){
+      toast("目的地が少ないです");
+      return;
+    }
+
+    if(!currentLatLng){
+      toast("先に 📍現在地 を取得してください");
+      return;
+    }
+
+    $("optBtn").disabled = true;
+    $("optBtn").textContent = "…計算中";
+
+    try{
+      const coords = buildCoordsForOSRM(currentLatLng, pending);
+      const D = await fetchDurationMatrix(coords);
+
+      if(!D){
+        toast("道路時間の取得に失敗しました");
+        return;
+      }
+
+      let path = nearestNeighborPath(D);
+      path = twoOptOpenPath(path, D);
+
+      const orderedPending = path
+        .slice(1)
+        .map(nodeIdx => pending[nodeIdx - 1]);
+
+      stops = [...orderedPending, ...done];
+      save();
+      redrawMarkers();
+      renderList();
+      toast("実道路ベースで最適化しました ✅");
+    }catch(e){
+      console.error(e);
+      toast("最適化に失敗しました");
+    }finally{
+      $("optBtn").disabled = false;
+      $("optBtn").textContent = "✨ 近い順";
+    }
+  }
+
+  function checkAutoArrival(posAccuracyM){
+    const now = Date.now();
+    if(now - lastAutoDoneAt < AUTO_DONE_COOLDOWN_MS) return;
+
+    if(typeof posAccuracyM === "number" && posAccuracyM > ARRIVE_MAX_ACC_M){
+      arriveInsideSince = 0;
+      return;
+    }
+
+    const next = getNextPendingStop();
+    if(!next || !currentLatLng){
+      arriveInsideSince = 0;
+      return;
+    }
+
+    const d = distanceMeters(
+      { lat: currentLatLng.lat, lng: currentLatLng.lng },
+      { lat: next.lat, lng: next.lng }
+    );
+
+    if(d <= ARRIVE_RADIUS_M){
+      if(!arriveInsideSince) arriveInsideSince = now;
+
+      if(now - arriveInsideSince >= ARRIVE_HOLD_MS){
+        arriveInsideSince = 0;
+        lastAutoDoneAt = now;
+
+        toast(`到着判定 ✅（${Math.round(d)}m）`);
+        setDone(next.id);
+
+        if(navigator.vibrate) navigator.vibrate([120, 80, 120]);
+      }
+    }else{
+      arriveInsideSince = 0;
+    }
   }
 
   function focusStop(id){
@@ -1605,28 +1832,27 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     }
   }
 
-  function setDone(id){
-  const s = stops.find(x => x.id === id);
-  if(!s) return;
+    function setDone(id){
+    const s = stops.find(x => x.id === id);
+    if(!s) return;
 
-  s.status = (s.status === "done") ? "pending" : "done";
+    const becameDone = (s.status !== "done");
+    s.status = (s.status === "done") ? "pending" : "done";
 
-  save();
-  redrawMarkers();
-  renderList();
+    save();
+    redrawMarkers();
+    renderList();
 
-  // 次の目的地を自動ナビ
-  if(s.status === "done"){
-    const next = stops.find(x => x.status === "pending");
-
-    if(next){
-      toast("次の目的地へナビ開始");
-      openNav(next.id);
-    }else{
-      toast("すべて完了しました 🎉");
+    if(becameDone && s.status === "done"){
+      const next = getNextPendingStop();
+      if(next){
+        toast("次の目的地へナビ開始");
+        openNav(next.id);
+      }else{
+        toast("すべて完了しました 🎉");
+      }
     }
   }
-}
 
   function openNav(id){
     const s = stops.find(x => x.id === id);
@@ -1747,6 +1973,7 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     }
 
     $("geoPill").textContent = "位置情報：OK";
+    checkAutoArrival(pos.coords.accuracy);
   }
 
   function onPosErr(err){
@@ -1948,7 +2175,7 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
   $("addBtn").addEventListener("click", addStop);
   $("clearBtn").addEventListener("click", clearAll);
   $("fitBtn").addEventListener("click", fitAll);
-  $("optBtn").addEventListener("click", optimizeOrder);
+  $("optBtn").addEventListener("click", optimizeOrderRoad);
 
   $("cancelAdjustBtn").addEventListener("click", () => cancelAdjust(false));
   $("confirmAdjustBtn").addEventListener("click", confirmAdjust);
