@@ -5,11 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>個別Navigation</title>
 
-  <!-- PWA (manifest) -->
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0b1020">
 
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -28,27 +26,46 @@
       --r:16px;
     }
     *{ box-sizing:border-box; }
+    *{
+      writing-mode: horizontal-tb !important;
+      text-orientation: mixed !important;
+    }
     body{
       margin:0;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
-      background: radial-gradient(1200px 700px at 10% 0%, rgba(110,168,255,.22), transparent 60%),
-                  radial-gradient(900px 600px at 90% 0%, rgba(72,213,151,.18), transparent 55%),
-                  var(--bg);
+      background:
+        radial-gradient(1200px 700px at 10% 0%, rgba(110,168,255,.22), transparent 60%),
+        radial-gradient(900px 600px at 90% 0%, rgba(72,213,151,.18), transparent 55%),
+        var(--bg);
       color:var(--text);
     }
 
     header{
-      position:sticky; top:0; z-index:50;
+      position:sticky;
+      top:0;
+      z-index:50;
       padding:10px 12px 12px;
       background: linear-gradient(to bottom, rgba(11,16,32,.95), rgba(11,16,32,.70));
       backdrop-filter: blur(10px);
       border-bottom:1px solid var(--line);
     }
     .row{ display:flex; gap:10px; align-items:center; }
-    .title{ font-weight:800; letter-spacing:.03em; font-size:16px; margin:0 0 8px; opacity:.95; }
-    .inputGrid{ display:grid; grid-template-columns: 1fr; gap:8px; }
+    .title{
+      font-weight:800;
+      letter-spacing:.03em;
+      font-size:16px;
+      margin:0 0 8px;
+      opacity:.95;
+    }
+    .inputGrid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:8px;
+    }
     .field{
-      display:flex; gap:8px; align-items:center;
+      display:flex;
+      gap:8px;
+      align-items:center;
       padding:10px;
       background: rgba(18,26,51,.85);
       border:1px solid var(--line);
@@ -56,28 +73,34 @@
     }
     .field input{
       width:100%;
-      border:0; outline:none;
+      border:0;
+      outline:none;
       background: transparent;
       color: var(--text);
       font-size:16px;
     }
-    .field input::placeholder{ color: rgba(233,238,252,.45); }
+    .field input::placeholder{
+      color: rgba(233,238,252,.45);
+    }
 
     .btn{
       border:1px solid var(--line);
       background: rgba(255,255,255,.06);
       color:var(--text);
       padding:10px 12px;
-      border-radius: 999px;
+      border-radius:999px;
       font-weight:700;
       font-size:14px;
       cursor:pointer;
       user-select:none;
       -webkit-tap-highlight-color: transparent;
-      display:inline-flex; gap:8px; align-items:center; justify-content:center;
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      justify-content:center;
       white-space:nowrap;
     }
-    .btn:active{ transform: translateY(1px); }
+    .btn:active{ transform:translateY(1px); }
     .btn.primary{ background: rgba(110,168,255,.18); border-color: rgba(110,168,255,.35); }
     .btn.good{ background: rgba(72,213,151,.16); border-color: rgba(72,213,151,.35); }
     .btn.danger{ background: rgba(255,107,107,.12); border-color: rgba(255,107,107,.3); }
@@ -90,7 +113,9 @@
       margin-top:8px;
       font-size:12px;
       color: var(--muted);
-      display:flex; gap:10px; flex-wrap:wrap;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
     }
     .pill{
       padding:6px 10px;
@@ -106,187 +131,131 @@
 
     #mapWrap{ padding:12px; }
     #map{
-      height: 46vh;
-      min-height: 320px;
+      height:46vh;
+      min-height:320px;
       border-radius: calc(var(--r) + 6px);
       border:1px solid var(--line);
       overflow:hidden;
-      box-shadow: 0 16px 50px rgba(0,0,0,.35);
+      box-shadow:0 16px 50px rgba(0,0,0,.35);
     }
 
-    main{ padding-bottom: 18px; }
+    main{ padding-bottom:18px; }
     .panel{
-      margin: 0 12px 12px;
-      padding: 12px;
+      margin:0 12px 12px;
+      padding:12px;
       border-radius: calc(var(--r) + 6px);
       border:1px solid var(--line);
       background: rgba(18,26,51,.60);
       backdrop-filter: blur(8px);
     }
     .listHeader{
-      display:flex; justify-content:space-between; align-items:center; gap:10px;
-      margin-bottom: 10px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:10px;
     }
-    .listHeader .meta{ color:var(--muted); font-size:12px; }
+    .listHeader .meta{
+      color:var(--muted);
+      font-size:12px;
+    }
     .list{
-      display:flex; flex-direction:column; gap:10px;
-      max-height: 38vh;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      max-height:38vh;
       overflow:auto;
-      padding-right: 4px;
+      padding-right:4px;
     }
-    .card {
-  border: 1px solid var(--line);
-  background: rgba(15, 23, 48, .68);
-  border-radius: var(--r);
-  padding: 12px;
-  display: flex; /* gridからflexに変更 */
-  flex-direction: column; /* 縦に並べる */
-  gap: 8px;
-  margin-bottom: 4px;
-}
 
-/* 名称と番号のスタイル */
-.card .name {
-  font-weight: 800;
-  font-size: 15px;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+    .card{
+      border:1px solid var(--line);
+      background: rgba(15,23,48,.68);
+      border-radius: var(--r);
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin-bottom:4px;
+    }
+    .card .name{
+      font-weight:800;
+      font-size:15px;
+      color:var(--text);
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .card .num{
+      background: var(--accent);
+      color:#000;
+      width:22px;
+      height:22px;
+      border-radius:50%;
+      display:grid;
+      place-items:center;
+      font-size:12px;
+    }
+    .card .addr{
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.4;
+      word-break:break-all;
+      border-left:2px solid var(--line);
+      padding-left:8px;
+    }
+    .card .actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-top:4px;
+    }
+    .card .actions .btn{
+      flex:1;
+      min-width:70px;
+      padding:8px 4px;
+      font-size:12px;
+    }
+    .card.done{
+      opacity:.6;
+      background: rgba(255,255,255,0.05);
+    }
+    .card.done .name{
+      text-decoration: line-through;
+    }
 
-.card .num {
-  background: var(--accent);
-  color: #000;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 12px;
-}
-
-    #ocrModal {
-  display: none;
-  position: fixed;
-  /* 画面全体に固定 */
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  height: -webkit-fill-available; /* iOSのツールバー対策 */
-  
-  background-color: #000 !important;
-  /* 他のどんな要素よりも上にする（地図やヘッダーがz-indexを使っているため） */
-  z-index: 2147483647 !important; 
-  margin: 0;
-  padding: 0;
-}
-
-#ocrVideo{
-  width: 100%;
-  height: 100%;
-  object-fit: contain;   /* coverからcontainに変更（黒帯を許容して歪みを防ぐ） */
-  background:#000;       /* 余白を黒に */
-  display: block;
-}
-
-#scanGuide{
-  position:absolute;
-  top:50%;
-  left:50%;
-  transform:translate(-50%, -50%);
-  width:85%;
-  height:90px;
-  border:2px solid var(--danger);
-  border-radius:12px;
-  box-shadow:0 0 0 4000px rgba(0,0,0,0.55);
-  pointer-events:none;
-}
-#scanGuide .scanGuideLabel{
-  position:absolute;
-  top:-28px;
-  left:0;
-  color:var(--danger);
-  font-size:12px;
-  font-weight:800;
-  text-shadow: 1px 1px 2px #000;
-}
-.ocrFooter{
-  position:absolute;
-  bottom:30px;
-  width:100%;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:15px;
-  padding:0 12px;
-}
-.ocrStatus{
-  color:#fff;
-  font-size:14px;
-  background:rgba(0,0,0,0.5);
-  padding:6px 14px;
-  border-radius:999px;
-}
-/* 住所の改行・視認性対策 */
-.card .addr {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.4;
-  word-break: break-all;
-  border-left: 2px solid var(--line);
-  padding-left: 8px;
-}
-
-/* アクションボタンを横一列に並べる（スマホで溢れないように） */
-.card .actions {
-  display: flex;
-  flex-wrap: wrap; /* ボタンが多い場合は折り返す */
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.card .actions .btn {
-  flex: 1; /* ボタンの幅を均等にする */
-  min-width: 70px; /* 小さくなりすぎないように */
-  padding: 8px 4px;
-  font-size: 12px;
-}
-
-/* 完了済みカードの見た目 */
-.card.done {
-  opacity: 0.6;
-  background: rgba(255, 255, 255, 0.05);
-}
-.card.done .name {
-  text-decoration: line-through;
-}
-    
+    .hint{
+      margin-top:10px;
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.5;
+    }
 
     .toast{
-      position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: 14px;
-      z-index: 9999;
-      padding: 10px 12px;
-      border-radius: 999px;
+      position:fixed;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:14px;
+      z-index:9999;
+      padding:10px 12px;
+      border-radius:999px;
       background: rgba(0,0,0,.65);
-      border: 1px solid rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.12);
       color: var(--text);
-      font-size: 13px;
+      font-size:13px;
       display:none;
-      max-width: min(92vw, 540px);
+      max-width:min(92vw,540px);
       text-align:center;
       backdrop-filter: blur(8px);
       white-space: pre-wrap;
     }
 
     .adjustBar{
-      position: fixed;
-      left: 12px; right: 12px; bottom: 12px;
-      z-index: 9998;
+      position:fixed;
+      left:12px;
+      right:12px;
+      bottom:12px;
+      z-index:9998;
       display:none;
       gap:10px;
       align-items:center;
@@ -296,39 +265,23 @@
       border:1px solid var(--line);
       background: rgba(18,26,51,.78);
       backdrop-filter: blur(10px);
-      box-shadow: 0 16px 50px rgba(0,0,0,.35);
+      box-shadow:0 16px 50px rgba(0,0,0,.35);
     }
     .adjustBar .msg{
-      font-size: 12px;
+      font-size:12px;
       color: var(--muted);
-      line-height: 1.35;
-    }
-    /* 縦書き残骸の完全除去（全称セレクタを避け、影響範囲を限定） */
-    body, body *{
-      writing-mode: horizontal-tb;
-      text-orientation: mixed;
-    }
-
-    /* ヒントテキスト */
-    .hint{
-      margin-top: 10px;
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.7;
-      padding: 8px 10px;
-      border-left: 3px solid var(--line);
+      line-height:1.35;
     }
   </style>
 </head>
+
 <body>
   <header>
     <div class="title">個別Navigation</div>
 
     <div class="inputGrid">
-      <!-- 郵便番号 → 住所補完 -->
       <div class="field">
-        <input id="zip" type="tel" inputmode="numeric" pattern="[0-9\-]*"
-               placeholder="郵便番号" autocomplete="postal-code">
+        <input id="zip" type="tel" inputmode="numeric" pattern="[0-9\-]*" placeholder="郵便番号" autocomplete="postal-code">
         <button class="btn small" id="zipBtn">〒 住所補完</button>
       </div>
 
@@ -339,7 +292,6 @@
 
       <div class="field">
         <button class="btn icon" id="micAddr" title="音声入力（住所）">🎤</button>
-        <button class="btn icon" id="ocrOpenBtn" title="OCRスキャン">📷</button>
         <input id="addr" type="text" placeholder="住所" autocomplete="off">
       </div>
 
@@ -355,7 +307,6 @@
         <div class="pill" id="countPill">件数：0</div>
         <div class="pill" id="speechPill">音声：未確認</div>
         <div class="pill" id="geoPill">位置情報：未確認</div>
-        
         <div class="pill" id="gpsPill">GPS：未監視</div>
         <div class="pill" id="hdgPill">方位：—</div>
       </div>
@@ -371,7 +322,7 @@
       <div class="listHeader">
         <div>
           <div style="font-weight:900;">目的地リスト</div>
-          <div class="meta">未完了ルート線 / ✨近い順（現在地起点）</div>
+          <div class="meta">実道路ルート / 実道路ベース最適化 / 次ナビ自動起動</div>
         </div>
         <div class="row">
           <button class="btn small" id="optBtn">✨ 近い順</button>
@@ -382,9 +333,11 @@
       <div class="list" id="list"></div>
 
       <div class="hint">
-        ※ 住所→座標は <b>/api/geocode</b>（Vercel経由）です。<br>
-        ※ 市街地のズレは <b>📍調整→✅確定</b> で入口を記憶できます。<br>
-        ※ トンネル等でGPSが止まったら <b>GPS：ロスト</b> が出ます（短時間は推測位置を表示）。
+        ※ 住所→座標は <b>/api/geocode</b><br>
+        ※ 共有入口位置取得は <b>/api/getPoint</b><br>
+        ※ 調整確定は <b>/api/savePoint</b><br>
+        ※ 実道路ルートは <b>/api/route</b><br>
+        ※ 実道路最適化は <b>/api/table</b>
       </div>
     </section>
   </main>
@@ -399,62 +352,68 @@
     </div>
   </div>
 
-  <div id="ocrModal" role="dialog" aria-modal="true" aria-label="OCRスキャン">
-    <video id="ocrVideo" autoplay muted playsinline></video>
-
-    <div id="scanGuide">
-      <div class="scanGuideLabel">ここに住所を合わせる</div>
-    </div>
-
-    <div class="ocrFooter">
-      <div id="ocrStatus" class="ocrStatus">カメラ起動中...</div>
-      <div class="row" style="gap:20px; justify-content:center;">
-        <button class="btn danger" id="ocrCloseBtn" style="padding:12px 24px;">閉じる</button>
-        <button class="btn primary" id="ocrCaptureBtn" style="padding:12px 24px; font-size:16px;">📷 読み取る</button>
-      </div>
-    </div>
-
-    <canvas id="ocrCanvas" style="display:none;"></canvas>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 (() => {
-  // ========= ★ API Key 設定 =========
-  // Google Cloud Vision API を使う場合はここにキーを入力
-  // 空文字列のままにすると Tesseract のみで動作
-  // 注意：本番運用では APIキーをフロントエンドに直接書くのは避け、
-  //       Vercel等のサーバーサイド経由（/api/vision）で呼ぶことを推奨
-  const GOOGLE_VISION_API_KEY = "";  // ← ここにキーを入力
-
-  // ========= Utilities =========
   const $ = (id) => document.getElementById(id);
+
   const toastEl = $("toast");
   let toastTimer = null;
   function toast(msg){
     toastEl.textContent = msg;
     toastEl.style.display = "block";
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.style.display = "none", 2600);
+    toastTimer = setTimeout(() => {
+      toastEl.style.display = "none";
+    }, 2600);
   }
-  function esc(s){ return (s ?? "").toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-  // ========= State =========
-  const STORAGE_KEY = "koguchi_delivery_stops_v4";
-  const GEO_CACHE_KEY = "koguchi_geo_cache_v1";
-  const PIN_MEMORY_KEY = "koguchi_pin_memory_v1";
+  function esc(s){
+    return (s ?? "").toString().replace(/[&<>"']/g, m => ({
+      '&':'&amp;',
+      '<':'&lt;',
+      '>':'&gt;',
+      '"':'&quot;',
+      "'":'&#39;'
+    }[m]));
+  }
+
+  const STORAGE_KEY = "koguchi_delivery_stops_v5";
+  const GEO_CACHE_KEY = "koguchi_geo_cache_v2";
+  const PIN_MEMORY_KEY = "koguchi_pin_memory_v2";
 
   const ADD_COOLDOWN_MS = 900;
   let lastAddAt = 0;
 
-  /** @type {{id:string,name:string,address:string,lat:number,lng:number,status:"pending"|"done",createdAt:number}[]} */
   let stops = [];
 
-  // route visuals
-  let routeLine = null;      // 未完了ルート線（直線）
-  let predictMarker = null;  // 推測位置
-  let routePtsCache = [];    // ルート線の座標配列（スナップ用）
+  let watchId = null;
+  let lastFixAt = 0;
+  let gpsLost = false;
+  let lostNotified = false;
+
+  const GPS_LOST_MS = 12000;
+  const PREDICT_MAX_MS = 90000;
+  const PREDICT_STEP_MS = 1000;
+  const SNAP_ROUTE_M = 55;
+
+  let currentMarker = null;
+  let currentLatLng = null;
+  let lastSpeedMps = null;
+  let headingDeg = null;
+  let predictMarker = null;
+  let predictTimer = null;
+  let lostBase = null;
+
   let roadRouteLine = null;
+  let roadRoutePtsCache = [];
+
+  let adjustingId = null;
+  let adjustMarker = null;
+  let adjustLatLng = null;
+
+  const adjustBar = $("adjustBar");
+  const adjustMsg = $("adjustMsg");
+  const hdgPill = $("hdgPill");
 
   const ARRIVE_RADIUS_M = 60;
   const ARRIVE_HOLD_MS = 4000;
@@ -462,65 +421,46 @@
   let arriveInsideSince = 0;
   let lastAutoDoneAt = 0;
   const AUTO_DONE_COOLDOWN_MS = 12000;
-  
-  // GPS watch / loss detect
-  let watchId = null;
-  let lastFixAt = 0;
-  let gpsLost = false;
-  let lostNotified = false;
 
-  // Recommended thresholds
-  const GPS_LOST_MS = 12_000;     // 12秒更新なしでロスト
-  const PREDICT_MAX_MS = 90_000;  // 推測は最大90秒
-  const SNAP_ROUTE_M = 55;        // ルート線に55m以内ならスナップ
-  const PREDICT_STEP_MS = 1000;   // 推測更新間隔
+  function toHalfWidthDigits(s){
+    return (s || "").replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  }
 
-  // current location / motion
-  let currentMarker = null;
-  let currentLatLng = null;
-  let lastSpeedMps = null;  // pos.coords.speed (m/s)
-  let headingDeg = null;    // コンパス方位（0=N）
-  let lastHeadingAt = 0;
-  let predictTimer = null;
-  let lostStartedAt = 0;
-  let lostBase = null;      // {lat,lng, t, speed, heading}
-  const hdgPill = $("hdgPill");
-
-  // adjust mode
-  let adjustingId = null;
-  let adjustMarker = null;
-  let adjustLatLng = null;
-
-  const adjustBar = $("adjustBar");
-  const adjustMsg = $("adjustMsg");
-
-  // ========= Address normalization =========
   function normalizeAddress(a){
-    return (a || "")
+    a = toHalfWidthDigits(a || "");
+    return a
       .replace(/[‐-–—−]/g, "-")
       .replace(/[ 　]+/g, " ")
       .replace(/(〒\s*\d{3}-?\d{4})/g, "")
+      .replace(/([0-9]+)\s*丁目/g, "$1丁目")
+      .replace(/([0-9]+)\s*番地/g, "$1番地")
+      .replace(/([0-9]+)\s*号/g, "$1号")
+      .replace(/\s*-\s*/g, "-")
       .replace(/(号室|室|階|F).*/g, "")
       .trim();
   }
+
   function stripBuilding(a){
     return (a || "")
       .replace(/(ビル|マンション|ハイツ|コーポ|アパート|タワー|メゾン|レジデンス|ハウス|コート).*/g, "")
       .trim();
   }
+
   function memKey(address){
     return normalizeAddress(address).toLowerCase();
   }
 
-  // ========= Pin memory =========
   function loadPinMemory(address){
     const k = memKey(address);
     if(!k) return null;
     try{
       const mem = JSON.parse(localStorage.getItem(PIN_MEMORY_KEY) || "{}");
       return mem[k] || null;
-    }catch(e){ return null; }
+    }catch(e){
+      return null;
+    }
   }
+
   function savePinMemory(address, lat, lng){
     const k = memKey(address);
     if(!k) return;
@@ -529,521 +469,39 @@
     localStorage.setItem(PIN_MEMORY_KEY, JSON.stringify(mem));
   }
 
-  // ========= Geo cache =========
   function loadGeoCache(){
-    try{ return JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || "{}") || {}; }
-    catch(e){ return {}; }
+    try{
+      return JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || "{}") || {};
+    }catch(e){
+      return {};
+    }
   }
+
   function saveGeoCache(cache){
     localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(cache));
   }
+
   function cacheKey(addr){
-    return (addr || "").toString().trim().toLowerCase();
+    return (addr || "").trim().toLowerCase();
   }
 
-  // ========= Persistence =========
   function load(){
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
       if(raw) stops = JSON.parse(raw) || [];
-    }catch(e){ stops = []; }
+    }catch(e){
+      stops = [];
+    }
   }
+
   function save(){
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stops));
   }
 
-  // ========= OCR Logic =========
-let ocrStream = null;
-let ocrWorker = null;
-let ocrTrack = null;
-let ocrImageCapture = null;
-let ocrStarting = false;
+  const map = L.map("map", { zoomControl:false }).setView([35.02, 135.86], 12);
+  L.control.zoom({ position:"bottomright" }).addTo(map);
 
-// モーダルと各要素の取得
-const ocrModal  = $("ocrModal");
-const ocrVideo  = $("ocrVideo");
-const ocrCanvas = $("ocrCanvas");
-const ocrStatus = $("ocrStatus");
-
-function showOCR() {
-  document.body.style.overflow = "hidden";
-  ocrModal.style.display = "block";
-}
-function hideOCR() {
-  ocrModal.style.display = "none";
-  document.body.style.overflow = "";
-}
-
-// カメラ起動
-async function startOCR() {
-  if (ocrStarting) return; // 多重起動防止
-  ocrStarting = true;
-
-  try {
-    showOCR();
-    ocrStatus.textContent = "カメラ起動中...";
-
-    // 1) カメラ起動
-    const constraints = {
-  video: {
-    facingMode: { ideal: "environment" },
-
-    // 解像度を高く
-    width:  { ideal: 1920 },
-    height: { ideal: 1080 },
-
-    // ピント自動調整
-    focusMode: "continuous",
-
-    // 明るさ自動
-    exposureMode: "continuous",
-
-    // ホワイトバランス
-    whiteBalanceMode: "continuous"
-  },
-  audio: false
-};
-
-    ocrStream = await navigator.mediaDevices.getUserMedia(constraints);
-    ocrVideo.srcObject = ocrStream;
-    
-    // トラック取得（1回だけ）
-    const track = ocrStream.getVideoTracks()[0];
-    const cap = track.getCapabilities ? track.getCapabilities() : {};
-    
-    if (cap.zoom) {
-      track.applyConstraints({
-        advanced: [{ zoom: 0.1 }]
-      });
-    }
-    
-    if (cap.focusMode) {
-      track.applyConstraints({
-        advanced: [{ focusMode: "continuous" }]
-      });
-    }
-    // iOS/Android 対策
-    ocrVideo.setAttribute("playsinline", "true");
-    ocrVideo.muted = true;
-
-    // videoの再生開始（待つ）
-    await ocrVideo.play();
-
-    // 2) 写真撮影用（対応端末のみ）
-    try {
-      ocrTrack = track; // 上で取得済みのtrackを再利用
-      if (window.ImageCapture && ocrTrack) {
-        ocrImageCapture = new ImageCapture(ocrTrack);
-      } else {
-        ocrImageCapture = null;
-      }
-    } catch (e) {
-      ocrImageCapture = null;
-    }
-
-    // 3) OCRワーカー初期化（重いので UI を更新しながら）
-    ocrStatus.textContent = "OCRエンジン起動中...（初回は少し時間がかかります）";
-
-    // タイムアウト（20秒）を用意：固まって見えるのを防ぐ
-    const timeoutMs = 20000;
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("OCR起動がタイムアウトしました")), timeoutMs)
-    );
-
-    // ensureOCRWorker() はあなたの関数（createWorker含む）
-    await Promise.race([ensureOCRWorker(), timeoutPromise]);
-
-    // 4) 準備完了
-    ocrStatus.textContent = "枠内に住所を合わせて『読み取る』を押してください";
-
-  } catch (e) {
-    console.error("startOCR error:", e);
-    toast("起動に失敗しました: " + (e?.message || e));
-    stopOCR();
-  } finally {
-    ocrStarting = false;
-  }
-}
-
-function stopOCR(){
-  try{
-    if(ocrStream){
-      ocrStream.getTracks().forEach(t=>t.stop());
-      ocrStream=null;
-    }
-    if(ocrVideo) ocrVideo.srcObject=null;
-    ocrTrack = null;
-    ocrImageCapture = null;
-  }finally{
-    hideOCR();
-    ocrStarting = false;
-  }
-}
-
-// OCR初期化（初回だけ）
-async function ensureOCRWorker() {
-  if (ocrWorker) return ocrWorker;
-
-  ocrStatus.textContent = "OCRエンジン起動中...";
-
-  // 日本語OCR起動
-  ocrWorker = await Tesseract.createWorker("jpn");
-
-  // ⭐住所OCR最適設定（固定レイアウトでない前提）
-  // 6: ブロック（複数行）として扱う→住所が2行に分かれても強い
-  await ocrWorker.setParameters({
-    tessedit_pageseg_mode: "6",
-    preserve_interword_spaces: "1",
-    tessedit_char_blacklist: "{}[]<>~`^=*_\""
-  });
-
-  return ocrWorker;
-}
-
-// ===== Address extraction helpers (fixed layout not assumed) =====
-function normalizeAddrText(s){
-  return (s || "")
-    .replace(/\s+/g, "")
-    .replace(/[|｜]+/g, "")
-    .replace(/^[〒\s]*/g, "")
-    .replace(/[‐-‒–—―ー−]/g, "-")
-    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    .trim();
-}
-
-function makeAddrCandidates(lines){
-  const L = (lines || [])
-    .map(s => (s || "").trim())
-    .filter(Boolean)
-    .filter(s => s.length >= 2);
-
-  const cands = [];
-  const pushBlock = (startIdx, take, label) => {
-    if (startIdx < 0 || startIdx >= L.length) return;
-    const block = L.slice(startIdx, startIdx + take).join("");
-    const norm = normalizeAddrText(block);
-    if (norm.length >= 8) cands.push({ label, text: norm });
-  };
-
-  const idxZip  = L.findIndex(l => /〒?\d{3}-?\d{4}/.test(l));
-  const idxPref = L.findIndex(l => /都|道|府|県/.test(l));
-  const idxCity = L.findIndex(l => /市|郡|町|村|丁目|番|号/.test(l));
-  const idxLong = L.reduce((best, cur, i) => (cur.length > (L[best]?.length || 0) ? i : best), 0);
-
-  pushBlock(idxZip, 3, "zip");
-  pushBlock(idxPref, 3, "pref");
-  pushBlock(idxCity, 3, "city");
-  pushBlock(idxLong, 2, "long");
-
-  // de-dup
-  const seen = new Set();
-  const uniq = [];
-  for (const c of cands) {
-    if (seen.has(c.text)) continue;
-    seen.add(c.text);
-    uniq.push(c);
-  }
-  return uniq.slice(0, 3);
-}
-
-
-// 候補3つをジオコーディングして「座標が取れた候補」を自動採用（固定レイアウト無し向け）
-async function pickBestCandidateByGeocode(candidates){
-  const cands = (candidates || []).filter(c => c && c.text);
-  if(!cands.length) return { text: "", geo: null, reason: "no_candidates" };
-
-  // geocodeWithFallback は後ろで定義される（関数宣言なので参照OK）
-  const quick = async (text, ms = 3500) => {
-    try{
-      return await Promise.race([
-        geocodeWithFallback(text),
-        new Promise(res => setTimeout(() => res(null), ms))
-      ]);
-    }catch(_e){
-      return null;
-    }
-  };
-
-  // なるべく待ち時間を増やさないため並列で投げる（最大3件）
-  const tasks = cands.slice(0,3).map((c, i) =>
-    quick(c.text).then(geo => ({ i, text: c.text, geo }))
-  );
-
-  const results = await Promise.all(tasks);
-  const ok = results.filter(r => r.geo && typeof r.geo.lat === "number" && typeof r.geo.lng === "number");
-
-  if(ok.length){
-    ok.sort((a,b) => a.i - b.i); // 先に作った候補を優先
-    return { text: ok[0].text, geo: ok[0].geo, reason: "geocode_ok" };
-  }
-  // 全滅なら「最もそれっぽい」候補を返す（後段の入力/再編集に回す）
-  return { text: cands[0].text, geo: null, reason: "geocode_failed" };
-}
-
-// ガイド枠内だけをキャプチャして解析
-async function captureAddress() {
-  if (!ocrStream) return;
-
-  try {
-    await ensureOCRWorker();
-  } catch (e) {
-    console.error(e);
-    toast("OCRエンジンの起動に失敗しました");
-    ocrStatus.textContent = "OCR起動エラー";
-    return;
-  }
-
-  const video = ocrVideo;
-  const canvas = ocrCanvas;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-  // 動画メタデータ待ち
-  if (!video.videoWidth || !video.videoHeight) {
-    await new Promise(r => setTimeout(r, 250));
-  }
-  if (!video.videoWidth || !video.videoHeight) {
-    toast("映像情報が取得できません。もう一度お試しください。");
-    return;
-  }
-
-  const guide = $("scanGuide");
-  const guideRect = guide.getBoundingClientRect();
-  const videoRect = video.getBoundingClientRect();
-
-  // --- object-fit: contain のズレ補正 ---
-  // CSSで #ocrVideo { object-fit: contain; } のため、黒帯(padding)を考慮する
-  const displayW = videoRect.width;
-  const displayH = videoRect.height;
-  const videoW = video.videoWidth;
-  const videoH = video.videoHeight;
-
-  const scale = Math.min(displayW / videoW, displayH / videoH);
-  const fittedW = videoW * scale;
-  const fittedH = videoH * scale;
-  const padX = (displayW - fittedW) / 2;
-  const padY = (displayH - fittedH) / 2;
-
-  const gxDisp = (guideRect.left - videoRect.left);
-  const gyDisp = (guideRect.top  - videoRect.top);
-  const gwDisp = guideRect.width;
-  const ghDisp = guideRect.height;
-
-  // 枠が黒帯にかかっていると、文字がない領域を切る → 先に弾く
-  if (
-    gxDisp < padX || gyDisp < padY ||
-    gxDisp + gwDisp > padX + fittedW ||
-    gyDisp + ghDisp > padY + fittedH
-  ){
-    ocrStatus.textContent = "枠が映像外（黒帯）です。枠を文字に合わせてください。";
-    return;
-  }
-
-  // fitted領域内(表示座標) → 元映像(videoW/H)座標へ
-  let sx = (gxDisp - padX) / scale;
-  let sy = (gyDisp - padY) / scale;
-  let sw = gwDisp / scale;
-  let sh = ghDisp / scale;
-
-  // clamp
-  sx = Math.max(0, sx);
-  sy = Math.max(0, sy);
-  sw = Math.min(videoW - sx, sw);
-  sh = Math.min(videoH - sy, sh);
-
-  if (sw < 20 || sh < 20) {
-    ocrStatus.textContent = "枠が小さすぎます。もう少し近づけてください。";
-    return;
-  }
-
-  // --- 静止画を用意（対応端末は takePhoto、非対応は video から drawImage） ---
-  let srcImage = null;
-  let srcW = videoW;
-  let srcH = videoH;
-
-  if (ocrImageCapture && typeof ocrImageCapture.takePhoto === "function") {
-    try {
-      const blob = await ocrImageCapture.takePhoto();
-      srcImage = await createImageBitmap(blob);
-      srcW = srcImage.width;
-      srcH = srcImage.height;
-    } catch (e) {
-      // takePhoto が失敗する端末があるのでフォールバック
-      srcImage = null;
-    }
-  }
-
-  // --- 描画（切り出し） ---
-  // takePhotoの実サイズが videoW/H と異なる場合に備えて倍率換算
-  const fx = srcImage ? (srcW / videoW) : 1;
-  const fy = srcImage ? (srcH / videoH) : 1;
-  const sxp = sx * fx;
-  const syp = sy * fy;
-  const swp = sw * fx;
-  const shp = sh * fy;
-
-  canvas.width = Math.max(1, Math.floor(swp));
-  canvas.height = Math.max(1, Math.floor(shp));
-
-  if (srcImage) {
-    ctx.drawImage(srcImage, sxp, syp, swp, shp, 0, 0, canvas.width, canvas.height);
-  } else {
-    // フォールバック：現在フレームから切り出し（videoW/Hに一致）
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-  }
-  // --- 2倍拡大（漢字に効く） ---
-  const tempCanvas = document.createElement("canvas");
-  tempCanvas.width = canvas.width * 2;
-  tempCanvas.height = canvas.height * 2;
-  const tctx = tempCanvas.getContext("2d", { willReadFrequently: true });
-  tctx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
-
-  // --- 二値化（薄い印字向けにしきい値を少し低め） ---
-  let imgData = tctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-  let data = imgData.data;
-
-  const THRESH = 160; // ← ここを 135〜165で微調整すると効きます
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i], g = data[i + 1], b = data[i + 2];
-    const gray = 0.3 * r + 0.59 * g + 0.11 * b;
-    const bw = gray > THRESH ? 255 : 0;
-    data[i] = data[i + 1] = data[i + 2] = bw;
-  }
-  tctx.putImageData(imgData, 0, 0);
-
-  // --- 太字化（膨張）: 細い漢字を拾いやすくする ---
-  let imgData2 = tctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-  let d = imgData2.data;
-  let w = tempCanvas.width;
-  let h = tempCanvas.height;
-
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const i = (y * w + x) * 4;
-      if (d[i] === 0) { // 黒
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const j = ((y + dy) * w + (x + dx)) * 4;
-            d[j] = d[j + 1] = d[j + 2] = 0;
-          }
-        }
-      }
-    }
-  }
-  tctx.putImageData(imgData2, 0, 0);
-
-  // OCR用キャンバスに戻す
-  canvas.width = tempCanvas.width;
-  canvas.height = tempCanvas.height;
-  ctx.drawImage(tempCanvas, 0, 0);
-
-  if (navigator.vibrate) navigator.vibrate(50);
-  ocrStatus.textContent = "解析中...しばらくお待ちください";
-  
-  try {
-    // ===== Step 1: Tesseract OCR =====
-    const result = await ocrWorker.recognize(canvas);
-    const rawText = result?.data?.text || "";
-
-    const lines = rawText
-      .split("\n")
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    const candidates = makeAddrCandidates(lines);
-    ocrStatus.textContent = "住所候補を確認中...";
-    const best = await pickBestCandidateByGeocode(candidates);
-    const picked = best.text || normalizeAddrText(lines.join(""));
-
-    if (picked.length >= 8 && best.reason === "geocode_ok") {
-      // Tesseractで座標まで確認できた → そのまま採用
-      $("addr").value = picked;
-      toast("住所を入力しました！（地図確認OK）");
-      stopOCR();
-      return;
-    }
-
-    // ===== Step 2: Google Cloud Vision API フォールバック =====
-    // Tesseractで住所が取れなかった/座標が確認できなかった場合にVision APIを試みる
-    const visionKey = typeof GOOGLE_VISION_API_KEY !== "undefined" ? GOOGLE_VISION_API_KEY : null;
-    if (visionKey) {
-      ocrStatus.textContent = "Vision APIで再解析中...";
-      try {
-        const imageBase64 = canvas.toDataURL("image/png").split(",")[1];
-        const visionRes = await fetch(
-          `https://vision.googleapis.com/v1/images:annotate?key=${visionKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              requests: [{
-                image: { content: imageBase64 },
-                features: [{ type: "TEXT_DETECTION", maxResults: 1 }],
-                imageContext: { languageHints: ["ja"] }
-              }]
-            })
-          }
-        );
-        if (visionRes.ok) {
-          const visionData = await visionRes.json();
-          const fullText = visionData?.responses?.[0]?.fullTextAnnotation?.text || "";
-          const vLines = fullText.split("\n").map(s => s.trim()).filter(Boolean);
-          const vCandidates = makeAddrCandidates(vLines);
-          ocrStatus.textContent = "Vision API結果を確認中...";
-          const vBest = await pickBestCandidateByGeocode(vCandidates);
-          const vPicked = vBest.text || normalizeAddrText(vLines.join(""));
-          if (vPicked.length >= 8) {
-            $("addr").value = vPicked;
-            toast(vBest.reason === "geocode_ok"
-              ? "住所を入力しました！（Vision API・地図確認OK）"
-              : "住所を入力しました！（Vision API）確認してください");
-            stopOCR();
-            return;
-          }
-        }
-      } catch (vErr) {
-        console.warn("Vision API fallback failed:", vErr);
-        // Vision APIが失敗してもTesseract結果で続行
-      }
-    }
-
-    // ===== Step 3: Tesseractの結果をそのまま使う（最終フォールバック） =====
-    if (picked.length >= 8) {
-      $("addr").value = picked;
-      toast("住所を入力しました！確認してください");
-      stopOCR();
-    } else {
-      ocrStatus.textContent = "住所が見つかりません。枠を近づけて再試行してください。";
-    }
-  } catch (err) {
-    console.error(err);
-    toast("解析エラーが発生しました");
-    ocrStatus.textContent = "解析エラー";
-  }
-}
-
-// イベント紐付け（スクリプトは body 末尾のため DOM は確実に存在する）
-const ocrOpenBtn = $("ocrOpenBtn");
-if (ocrOpenBtn) ocrOpenBtn.addEventListener("click", startOCR);
-$("ocrCloseBtn").addEventListener("click", stopOCR);
-$("ocrCaptureBtn").addEventListener("click", captureAddress);
-// ========= Map =========
-  const map = L.map("map", { zoomControl: false }).setView([35.02, 135.86], 12);
-  L.control.zoom({ position: "bottomright" }).addTo(map);
-  const markersLayer = L.layerGroup().addTo(map);
-
-  // tap/long press: move adjust marker
-  map.on("click", (e) => {
-    if(!adjustingId || !adjustMarker) return;
-    adjustMarker.setLatLng(e.latlng);
-    adjustLatLng = { lat: e.latlng.lat, lng: e.latlng.lng };
-  });
-  map.on("contextmenu", (e) => {
-    if(!adjustingId || !adjustMarker) return;
-    adjustMarker.setLatLng(e.latlng);
-    adjustLatLng = { lat: e.latlng.lat, lng: e.latlng.lng };
-  });
-    const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "&copy; OpenStreetMap"
   }).addTo(map);
@@ -1051,18 +509,31 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
   const gsiStandard = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", {
     attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>"
   });
+
   const gsiPale = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", {
     attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>"
   });
 
-  const baseMaps = {
+  L.control.layers({
     "OSM (標準)": osm,
     "地理院 (標準)": gsiStandard,
     "地理院 (淡色)": gsiPale
-  };
-  L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+  }, null, { position:"topright" }).addTo(map);
 
-  // ========= Distance helpers =========
+  const markersLayer = L.layerGroup().addTo(map);
+
+  map.on("click", (e) => {
+    if(!adjustingId || !adjustMarker) return;
+    adjustMarker.setLatLng(e.latlng);
+    adjustLatLng = { lat:e.latlng.lat, lng:e.latlng.lng };
+  });
+
+  map.on("contextmenu", (e) => {
+    if(!adjustingId || !adjustMarker) return;
+    adjustMarker.setLatLng(e.latlng);
+    adjustLatLng = { lat:e.latlng.lat, lng:e.latlng.lng };
+  });
+
   function distanceMeters(a, b){
     const R = 6371000;
     const toRad = (d) => d * Math.PI / 180;
@@ -1070,18 +541,15 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     const dLng = toRad(b.lng - a.lng);
     const lat1 = toRad(a.lat);
     const lat2 = toRad(b.lat);
-    const x = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+    const x = Math.sin(dLat/2)**2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng/2)**2;
     return 2 * R * Math.asin(Math.sqrt(x));
   }
 
-  // ========= Simple route snapping (④代替) =========
-  // lat/lngを近似平面にして最近点を求める（短距離用）
   function snapToRouteIfNear(pos){
-    if(!routePtsCache || routePtsCache.length < 2) return pos;
+    if(!roadRoutePtsCache || roadRoutePtsCache.length < 2) return pos;
 
-    // ルート線の最近点（線分）を探す
-    const lat0 = pos.lat * Math.PI/180;
-    const kx = 111320 * Math.cos(lat0); // deg->m approx
+    const lat0 = pos.lat * Math.PI / 180;
+    const kx = 111320 * Math.cos(lat0);
     const ky = 110540;
 
     const px = pos.lng * kx;
@@ -1090,61 +558,68 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     let best = null;
     let bestD2 = Infinity;
 
-    for(let i=0;i<routePtsCache.length-1;i++){
-      const a = routePtsCache[i];
-      const b = routePtsCache[i+1];
+    for(let i=0; i<roadRoutePtsCache.length - 1; i++){
+      const a = roadRoutePtsCache[i];
+      const b = roadRoutePtsCache[i+1];
 
-      const ax = a.lng * kx, ay = a.lat * ky;
-      const bx = b.lng * kx, by = b.lat * ky;
+      const ax = a.lng * kx;
+      const ay = a.lat * ky;
+      const bx = b.lng * kx;
+      const by = b.lat * ky;
 
-      const vx = bx - ax, vy = by - ay;
-      const wx = px - ax, wy = py - ay;
+      const vx = bx - ax;
+      const vy = by - ay;
+      const wx = px - ax;
+      const wy = py - ay;
 
       const vv = vx*vx + vy*vy;
-      let t = vv ? (wx*vx + wy*vy)/vv : 0;
+      let t = vv ? (wx*vx + wy*vy) / vv : 0;
       t = Math.max(0, Math.min(1, t));
 
-      const cx = ax + t*vx;
-      const cy = ay + t*vy;
-
-      const dx = px - cx, dy = py - cy;
+      const cx = ax + t * vx;
+      const cy = ay + t * vy;
+      const dx = px - cx;
+      const dy = py - cy;
       const d2 = dx*dx + dy*dy;
 
       if(d2 < bestD2){
         bestD2 = d2;
-        best = { x: cx, y: cy, kx, ky };
+        best = { x:cx, y:cy, kx, ky };
       }
     }
 
     if(!best) return pos;
-    const d = Math.sqrt(bestD2); // meters
+
+    const d = Math.sqrt(bestD2);
     if(d > SNAP_ROUTE_M) return pos;
 
-    // snapped point back to lat/lng
-    return { lat: best.y / best.ky, lng: best.x / best.kx, snapped: true };
+    return {
+      lat: best.y / best.ky,
+      lng: best.x / best.kx,
+      snapped: true
+    };
   }
 
-  // ========= Adjust mode =========
   function startAdjust(id){
     const s = stops.find(x => x.id === id);
     if(!s) return;
 
     adjustingId = id;
-    adjustLatLng = { lat: s.lat, lng: s.lng };
+    adjustLatLng = { lat:s.lat, lng:s.lng };
 
     if(adjustMarker){
       map.removeLayer(adjustMarker);
       adjustMarker = null;
     }
 
-    adjustMarker = L.marker([s.lat, s.lng], { draggable: true })
+    adjustMarker = L.marker([s.lat, s.lng], { draggable:true })
       .addTo(map)
       .bindPopup("📍 調整中（ドラッグ / タップ / 長押し）")
       .openPopup();
 
     adjustMarker.on("dragend", () => {
       const p = adjustMarker.getLatLng();
-      adjustLatLng = { lat: p.lat, lng: p.lng };
+      adjustLatLng = { lat:p.lat, lng:p.lng };
     });
 
     map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
@@ -1153,66 +628,60 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     toast("調整モードに入りました");
   }
 
-  function cancelAdjust(showToast=true){
-  adjustingId = null;
-  adjustLatLng = null;
+  function cancelAdjust(showToast = true){
+    adjustingId = null;
+    adjustLatLng = null;
 
-  if(adjustMarker){
-    map.removeLayer(adjustMarker);
-    adjustMarker = null;
+    if(adjustMarker){
+      map.removeLayer(adjustMarker);
+      adjustMarker = null;
+    }
+    adjustBar.style.display = "none";
+    if(showToast) toast("キャンセルしました");
   }
-  adjustBar.style.display = "none";
-  if(showToast) toast("キャンセルしました");
-}
 
   async function confirmAdjust(){
-  if(!adjustingId || !adjustLatLng){
-    cancelAdjust(true);
-    return;
+    if(!adjustingId || !adjustLatLng){
+      cancelAdjust(true);
+      return;
+    }
+
+    const s = stops.find(x => x.id === adjustingId);
+    if(!s){
+      cancelAdjust(true);
+      return;
+    }
+
+    s.lat = adjustLatLng.lat;
+    s.lng = adjustLatLng.lng;
+
+    save();
+    savePinMemory(s.address, s.lat, s.lng);
+
+    try{
+      await fetch("/api/savePoint", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          address: (s.address || "").trim(),
+          lat: s.lat,
+          lng: s.lng
+        })
+      });
+      toast("共有保存しました");
+    }catch(e){
+      console.log("共有保存失敗", e);
+      toast("共有保存に失敗（ネットワーク/設定確認）");
+    }
+
+    redrawMarkers();
+    renderList();
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
+
+    cancelAdjust(false);
+    toast("確定しました ✅");
   }
 
-  const s = stops.find(x => x.id === adjustingId);
-  if(!s){
-    cancelAdjust(true);
-    return;
-  }
-
-  // ① stopsの座標を更新（確定）
-  s.lat = adjustLatLng.lat;
-  s.lng = adjustLatLng.lng;
-
-  // 端末内メモリにも保存（既存）
-  save();
-  savePinMemory(s.address, s.lat, s.lng);
-
-  // ② 共有DBに保存（ここは cancelAdjust する前に実行）
-  try{
-    await fetch("/api/savePoint", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({
-        address: (s.address || "").trim(), // ★これをキーにする
-        lat: s.lat,
-        lng: s.lng
-      })
-    });
-    toast("共有保存しました");
-  }catch(e){
-    console.log("共有保存失敗", e);
-    toast("共有保存に失敗（ネットワーク/設定確認）");
-  }
-
-  // ③ UI更新
-  redrawMarkers();
-  renderList();
-  map.setView([s.lat, s.lng], Math.max(map.getZoom(), 17), { animate:true });
-
-  // ④ 調整モード終了（トーストは出さない）
-  cancelAdjust(false);
-  toast("確定しました ✅");
-}
-
-  // ========= QR(URL params) -> inputs =========
   function applyQueryToInputs(){
     try{
       const u = new URL(location.href);
@@ -1222,70 +691,62 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
 
       if(qName) $("name").value = qName;
       if(qAddr) $("addr").value = qAddr;
-      toast("QRから入力しました（登録を押してください）");
 
+      toast("QRから入力しました（登録を押してください）");
       u.search = "";
       history.replaceState({}, "", u.toString());
       $("addr").focus();
-    }catch(e){ console.warn(e); }
+    }catch(e){}
   }
 
-  
-  
-  // ========= Zip -> address =========
   async function fetchAddressByZip(zipRaw){
     const zip = (zipRaw || "").replace(/[^\d]/g, "");
     if(zip.length !== 7) throw new Error("郵便番号は7桁で入力してください");
+
     const url = `https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zip}`;
     const res = await fetch(url);
     const j = await res.json();
+
     if(j.status !== 200 || !j.results || !j.results[0]){
       throw new Error("郵便番号から住所が見つかりません");
     }
+
     const r = j.results[0];
     return `${r.address1}${r.address2}${r.address3}`;
   }
 
-  // ========= Geocoding via Vercel API =========
   function isValidLatLng(lat, lng){
-    // 日本ざっくり範囲（必要なら調整）
     return (
-      typeof lat === "number" && typeof lng === "number" &&
-      isFinite(lat) && isFinite(lng) &&
+      typeof lat === "number" &&
+      typeof lng === "number" &&
+      isFinite(lat) &&
+      isFinite(lng) &&
       lat >= 20 && lat <= 50 &&
       lng >= 120 && lng <= 155
     );
   }
 
   function normalizeLatLngMaybeSwap(lat, lng){
-    // もし逆っぽい（latが120以上など）なら入れ替えを試す
     if(isValidLatLng(lat, lng)) return { lat, lng, swapped:false };
-    if(isValidLatLng(lng, lat)) return { lat: lng, lng: lat, swapped:true };
+    if(isValidLatLng(lng, lat)) return { lat:lng, lng:lat, swapped:true };
     return null;
   }
 
-  async function fetchJsonWithTimeout(url, opts={}, timeoutMs=9000){
+  async function fetchJsonWithTimeout(url, opts = {}, timeoutMs = 9000){
     const ac = new AbortController();
     const t = setTimeout(() => ac.abort("timeout"), timeoutMs);
     try{
       const res = await fetch(url, { ...opts, signal: ac.signal });
       const ct = (res.headers.get("content-type") || "").toLowerCase();
-      if(!res.ok){
-        // ここで本文を読むとCORSやHTMLで落ちるので最低限
-        throw new Error(`geocode http ${res.status}`);
-      }
-      if(!ct.includes("application/json")){
-        throw new Error("geocode not json");
-      }
+      if(!res.ok) throw new Error(`geocode http ${res.status}`);
+      if(!ct.includes("application/json")) throw new Error("geocode not json");
       return await res.json();
-    }finally{
+    } finally {
       clearTimeout(t);
     }
   }
 
   function pickBestFeature(features){
-    // できれば「精度が高そう」なものを選ぶ（プロパティ名はAPI差があるので複数対応）
-    // score / relevance / confidence / importance などがあれば高い方を優先
     const scored = features.map(f => {
       const p = f.properties || {};
       const s =
@@ -1296,53 +757,45 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
         0;
       return { f, s };
     });
-    scored.sort((a,b)=> b.s - a.s);
+    scored.sort((a,b) => b.s - a.s);
     return scored[0]?.f || null;
   }
 
   function extractLatLngFromGeocodeResponse(data){
+    if(Array.isArray(data) && data.length){
+      const f = data[0];
+      const coords = f?.geometry?.coordinates;
+      if(Array.isArray(coords) && coords.length >= 2){
+        const lng = Number(coords[0]);
+        const lat = Number(coords[1]);
+        const fixed = normalizeLatLngMaybeSwap(lat, lng);
+        if(fixed) return fixed;
+      }
+    }
 
-  // ★ 追加：dataが直接配列の場合（あなたのケース）
-  if(Array.isArray(data) && data.length){
-    const f = data[0];
-    const coords = f?.geometry?.coordinates;
-    if(Array.isArray(coords) && coords.length >= 2){
-      const lng = Number(coords[0]);
-      const lat = Number(coords[1]);
+    if(data && Array.isArray(data.features) && data.features.length){
+      const best = pickBestFeature(data.features) || data.features[0];
+      const coords = best?.geometry?.coordinates;
+      if(Array.isArray(coords) && coords.length >= 2){
+        const lng = Number(coords[0]);
+        const lat = Number(coords[1]);
+        const fixed = normalizeLatLngMaybeSwap(lat, lng);
+        if(fixed) return fixed;
+      }
+    }
+
+    if(data && (("lat" in data) || ("lng" in data) || ("lon" in data))){
+      const lat = Number(data.lat);
+      const lng = Number(data.lng ?? data.lon);
       const fixed = normalizeLatLngMaybeSwap(lat, lng);
       if(fixed) return fixed;
     }
+
+    return null;
   }
-
-  // ① GeoJSON FeatureCollection形式
-  if(data && Array.isArray(data.features) && data.features.length){
-    const best = pickBestFeature(data.features) || data.features[0];
-    const coords = best?.geometry?.coordinates;
-    if(Array.isArray(coords) && coords.length >= 2){
-      const lng = Number(coords[0]);
-      const lat = Number(coords[1]);
-      const fixed = normalizeLatLngMaybeSwap(lat, lng);
-      if(fixed) return fixed;
-    }
-  }
-
-  // ② {lat,lng} 直返し対応
-  if(data && (("lat" in data) || ("lng" in data) || ("lon" in data))){
-    const lat = Number(data.lat);
-    const lng = Number(data.lng ?? data.lon);
-    const fixed = normalizeLatLngMaybeSwap(lat, lng);
-    if(fixed) return fixed;
-  }
-
-  return null;
-}
-
-    
 
   async function geocodeAddress(addr){
     const url = "/api/geocode?q=" + encodeURIComponent(addr);
-
-    // 1回目
     try{
       const data = await fetchJsonWithTimeout(url, {}, 9000);
       console.log("GEOCODE raw response:", data);
@@ -1350,17 +803,31 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
       if(ll) return { lat: ll.lat, lng: ll.lng };
       return null;
     }catch(e){
-      // たまに一時失敗するので軽くリトライ（タイムアウト/ネット系のみ）
-      const msg = (e && e.message) ? e.message : String(e);
+      const msg = e?.message || String(e);
       const retryable = msg.includes("timeout") || msg.includes("Failed to fetch") || msg.includes("network");
       if(!retryable) return null;
 
       try{
         await new Promise(r => setTimeout(r, 450));
         const data2 = await fetchJsonWithTimeout(url, {}, 9000);
+        console.log("GEOCODE raw response(retry):", data2);
         const ll2 = extractLatLngFromGeocodeResponse(data2);
         if(ll2) return { lat: ll2.lat, lng: ll2.lng };
       }catch(_e2){}
+      return null;
+    }
+  }
+
+  async function getSharedPoint(address){
+    try{
+      const res = await fetch("/api/getPoint?address=" + encodeURIComponent((address || "").trim()));
+      if(!res.ok) return null;
+      const data = await res.json();
+      if(isValidLatLng(Number(data?.lat), Number(data?.lng))){
+        return { lat:Number(data.lat), lng:Number(data.lng) };
+      }
+      return null;
+    }catch(e){
       return null;
     }
   }
@@ -1370,25 +837,27 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     const a1 = normalizeAddress(rawAddress);
     if(!a1) return null;
 
-    // ① 端末内「入口記憶」を最優先（既存の loadPinMemory を使う）
     const remembered = loadPinMemory(a1);
     if(remembered && isValidLatLng(Number(remembered.lat), Number(remembered.lng))){
-      return { lat: Number(remembered.lat), lng: Number(remembered.lng) };
+      return { lat:Number(remembered.lat), lng:Number(remembered.lng) };
     }
 
-    // ② ローカル geocode キャッシュ
+    const shared = await getSharedPoint(a1);
+    if(shared) return shared;
+
     const k1 = cacheKey(a1);
     if(cache[k1] && isValidLatLng(Number(cache[k1].lat), Number(cache[k1].lng))){
       return cache[k1];
     }
 
-    // ③ まず通常住所で geocode
     let geo = await geocodeAddress(a1);
 
-    // ④ ダメなら建物名などを外して再試行
     if(!geo){
       const a2 = stripBuilding(a1);
       if(a2 && a2 !== a1){
+        const shared2 = await getSharedPoint(a2);
+        if(shared2) return shared2;
+
         const k2 = cacheKey(a2);
         if(cache[k2] && isValidLatLng(Number(cache[k2].lat), Number(cache[k2].lng))){
           geo = cache[k2];
@@ -1401,7 +870,6 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
       }
     }
 
-    // ⑤ 成功したらキャッシュ（a1にも保存して次回速く）
     if(geo && isValidLatLng(Number(geo.lat), Number(geo.lng))){
       cache[k1] = geo;
       saveGeoCache(cache);
@@ -1411,7 +879,6 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     return null;
   }
 
-  // ========= Render =========
   function updatePills(){
     $("countPill").textContent = `件数：${stops.length}`;
   }
@@ -1422,7 +889,7 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     const bd = status === "done" ? "rgba(255,255,255,.22)" : "rgba(110,168,255,.55)";
     const color = "rgba(233,238,252,.95)";
     return L.divIcon({
-      className: "",
+      className:"",
       html: `
         <div style="
           width:34px;height:34px;border-radius:999px;
@@ -1435,28 +902,43 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
           backdrop-filter: blur(6px);
         ">${n}</div>
       `,
-      iconSize: [34,34],
-      iconAnchor: [17,34]
+      iconSize:[34,34],
+      iconAnchor:[17,34]
     });
   }
 
-  function drawRouteLine(){
-    // 未完了だけ
-    const pts = stops.filter(s => s.status === "pending").map(s => [s.lat, s.lng]);
+  async function drawRoadRouteLine(){
+    const pending = stops.filter(s => s.status === "pending");
 
-    // cache for snapping (as objects)
-    routePtsCache = stops.filter(s => s.status === "pending").map(s => ({ lat: s.lat, lng: s.lng }));
-
-    if(routeLine){
-      map.removeLayer(routeLine);
-      routeLine = null;
+    if(roadRouteLine){
+      map.removeLayer(roadRouteLine);
+      roadRouteLine = null;
     }
-    if(pts.length < 2) return;
+    roadRoutePtsCache = [];
 
-    routeLine = L.polyline(pts, { weight: 4, opacity: 0.9 }).addTo(map);
+    if(pending.length < 2) return;
+
+    try{
+      const coords = pending.map(s => `${s.lng},${s.lat}`).join(";");
+      const r = await fetch("/api/route?coords=" + encodeURIComponent(coords));
+      const data = await r.json();
+
+      const coordsArr = data?.routes?.[0]?.geometry?.coordinates;
+      if(!Array.isArray(coordsArr) || coordsArr.length < 2) return;
+
+      const latlngs = coordsArr.map(([lng, lat]) => [lat, lng]);
+      roadRoutePtsCache = coordsArr.map(([lng, lat]) => ({ lat, lng }));
+
+      roadRouteLine = L.polyline(latlngs, {
+        weight:5,
+        opacity:0.95
+      }).addTo(map);
+    }catch(e){
+      console.warn("drawRoadRouteLine failed", e);
+    }
   }
 
-    function redrawMarkers(){
+  function redrawMarkers(){
     markersLayer.clearLayers();
 
     stops.forEach((s, i) => {
@@ -1481,32 +963,49 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
       const card = document.createElement("div");
       card.className = "card" + (s.status === "done" ? " done" : "");
       card.innerHTML = `
-  <div class="name">
-    <span class="num">${idx+1}</span>
-    ${esc(s.name || "（名称なし）")}
-  </div>
-  <div class="addr">${esc(s.address)}</div>
-  <div class="actions">
-    <button class="btn small primary" data-action="nav" data-id="${esc(s.id)}">▶ ナビ</button>
-    <button class="btn small good" data-action="done" data-id="${esc(s.id)}">${s.status === "done" ? "戻す" : "✔ 完了"}</button>
-    <button class="btn small" data-action="focus" data-id="${esc(s.id)}">🗺 地図</button>
-    <button class="btn small" data-action="adjust" data-id="${esc(s.id)}">📍 調整</button>
-  </div>
-`;
+        <div class="name">
+          <span class="num">${idx + 1}</span>
+          ${esc(s.name || "（名称なし）")}
+        </div>
+        <div class="addr">${esc(s.address)}</div>
+        <div class="actions">
+          <button class="btn small primary" data-action="nav" data-id="${esc(s.id)}">▶ ナビ</button>
+          <button class="btn small good" data-action="done" data-id="${esc(s.id)}">${s.status === "done" ? "戻す" : "✔ 完了"}</button>
+          <button class="btn small" data-action="focus" data-id="${esc(s.id)}">🗺 地図</button>
+          <button class="btn small" data-action="adjust" data-id="${esc(s.id)}">📍 調整</button>
+        </div>
+      `;
       list.appendChild(card);
     });
 
     updatePills();
   }
 
-    function getNextPendingStop(){
+  function focusStop(id){
+    const s = stops.find(x => x.id === id);
+    if(!s) return;
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 16), { animate:true });
+  }
+
+  function fitAll(){
+    const pending = stops.filter(s => s.status === "pending");
+    if(pending.length === 0){
+      toast(stops.length ? "未完了がありません" : "目的地がありません");
+      return;
+    }
+
+    const latlngs = pending.map(s => [s.lat, s.lng]);
+    map.fitBounds(L.latLngBounds(latlngs).pad(0.22));
+  }
+
+  function getNextPendingStop(){
     return stops.find(s => s.status === "pending") || null;
   }
 
   function buildCoordsForOSRM(startLatLng, pendingStops){
     const pts = [
-      { lat: startLatLng.lat, lng: startLatLng.lng },
-      ...pendingStops.map(s => ({ lat: s.lat, lng: s.lng }))
+      { lat:startLatLng.lat, lng:startLatLng.lng },
+      ...pendingStops.map(s => ({ lat:s.lat, lng:s.lng }))
     ];
     return pts.map(p => `${p.lng},${p.lat}`).join(";");
   }
@@ -1521,8 +1020,9 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
 
   function routeCost(order, D){
     let sum = 0;
-    for(let i=0;i<order.length-1;i++){
-      const a = order[i], b = order[i+1];
+    for(let i=0; i<order.length - 1; i++){
+      const a = order[i];
+      const b = order[i + 1];
       const v = D[a]?.[b];
       if(!(typeof v === "number" && isFinite(v))) return Infinity;
       sum += v;
@@ -1537,7 +1037,7 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     used[0] = true;
 
     for(let step=1; step<n; step++){
-      const last = path[path.length-1];
+      const last = path[path.length - 1];
       let best = -1;
       let bestV = Infinity;
 
@@ -1567,7 +1067,7 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     return path;
   }
 
-  function twoOptOpenPath(path, D, maxIters=1200){
+  function twoOptOpenPath(path, D, maxIters = 1200){
     const n = path.length;
     if(n < 4) return path;
 
@@ -1588,7 +1088,6 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
             newPath[a] = newPath[b];
             newPath[b] = tmp;
           }
-
           const c = routeCost(newPath, D);
           if(c < bestCost){
             bestCost = c;
@@ -1600,36 +1099,6 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     }
 
     return bestPath;
-  }
-
-  async function drawRoadRouteLine(){
-    const pending = stops.filter(s => s.status === "pending");
-
-    if(roadRouteLine){
-      map.removeLayer(roadRouteLine);
-      roadRouteLine = null;
-    }
-
-    if(pending.length < 2) return;
-
-    try{
-      const coords = pending.map(s => `${s.lng},${s.lat}`).join(";");
-      const r = await fetch("/api/route?coords=" + encodeURIComponent(coords));
-      const data = await r.json();
-
-      const coordsArr = data?.routes?.[0]?.geometry?.coordinates;
-      if(!Array.isArray(coordsArr) || coordsArr.length < 2){
-        return;
-      }
-
-      const latlngs = coordsArr.map(([lng, lat]) => [lat, lng]);
-      roadRouteLine = L.polyline(latlngs, {
-        weight: 5,
-        opacity: 0.95
-      }).addTo(map);
-    }catch(e){
-      console.warn("drawRoadRouteLine failed", e);
-    }
   }
 
   async function optimizeOrderRoad(){
@@ -1679,106 +1148,21 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     }
   }
 
-  function checkAutoArrival(posAccuracyM){
-    const now = Date.now();
-    if(now - lastAutoDoneAt < AUTO_DONE_COOLDOWN_MS) return;
-
-    if(typeof posAccuracyM === "number" && posAccuracyM > ARRIVE_MAX_ACC_M){
-      arriveInsideSince = 0;
-      return;
-    }
-
-    const next = getNextPendingStop();
-    if(!next || !currentLatLng){
-      arriveInsideSince = 0;
-      return;
-    }
-
-    const d = distanceMeters(
-      { lat: currentLatLng.lat, lng: currentLatLng.lng },
-      { lat: next.lat, lng: next.lng }
-    );
-
-    if(d <= ARRIVE_RADIUS_M){
-      if(!arriveInsideSince) arriveInsideSince = now;
-
-      if(now - arriveInsideSince >= ARRIVE_HOLD_MS){
-        arriveInsideSince = 0;
-        lastAutoDoneAt = now;
-
-        toast(`到着判定 ✅（${Math.round(d)}m）`);
-        setDone(next.id);
-
-        if(navigator.vibrate) navigator.vibrate([120, 80, 120]);
-      }
-    }else{
-      arriveInsideSince = 0;
-    }
-  }
-
-  function focusStop(id){
-    const s = stops.find(x => x.id === id);
-    if(!s) return;
-    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 16), { animate:true });
-  }
-
-  function fitAll(){
-    const pending = stops.filter(s => s.status === "pending");
-    if(pending.length === 0){
-      toast(stops.length ? "未完了がありません" : "目的地がありません");
-      return;
-    }
-    const latlngs = pending.map(s => [s.lat, s.lng]);
-    map.fitBounds(L.latLngBounds(latlngs).pad(0.22));
-  }
-
-  // ========= Optimize order (A: current location start) =========
-  function dist2(a, b){
-    const dx = a.lat - b.lat;
-    const dy = a.lng - b.lng;
-    return dx*dx + dy*dy;
-  }
-
-  function optimizeOrder(){
-    const pending = stops.filter(s => s.status === "pending");
-    const done = stops.filter(s => s.status === "done");
-    if(pending.length <= 2){ toast("最適化する件数が少ないです"); return; }
-
-    const start = currentLatLng
-      ? { lat: currentLatLng.lat, lng: currentLatLng.lng }
-      : { lat: pending[0].lat, lng: pending[0].lng };
-
-    const remaining = pending.slice();
-    const ordered = [];
-    let cur = start;
-
-    while(remaining.length){
-      let bestIdx = 0, bestD = Infinity;
-      for(let i=0;i<remaining.length;i++){
-        const d = dist2(cur, remaining[i]);
-        if(d < bestD){ bestD = d; bestIdx = i; }
-      }
-      const next = remaining.splice(bestIdx, 1)[0];
-      ordered.push(next);
-      cur = { lat: next.lat, lng: next.lng };
-    }
-
-    stops = [...ordered, ...done];
-    save();
-    redrawMarkers();
-    renderList();
-    toast(currentLatLng ? "現在地から近い順に並べ替えました" : "近い順に並べ替えました");
-  }
-
-  // ========= Actions =========
   async function addStop(){
     const now = Date.now();
-    if(now - lastAddAt < ADD_COOLDOWN_MS){ toast("連続追加は少し待ってね"); return; }
+    if(now - lastAddAt < ADD_COOLDOWN_MS){
+      toast("連続追加は少し待ってね");
+      return;
+    }
     lastAddAt = now;
 
     const name = $("name").value.trim();
     const addressRaw = $("addr").value.trim();
-    if(!addressRaw){ toast("住所を入力してください"); $("addr").focus(); return; }
+    if(!addressRaw){
+      toast("住所を入力してください");
+      $("addr").focus();
+      return;
+    }
 
     $("addBtn").disabled = true;
     $("addBtn").textContent = "…座標化中";
@@ -1797,16 +1181,20 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
           toast("住所が見つかりませんでした。\n・県市から入れる\n・建物名/部屋番号を外す\nを試してください");
           return;
         }
-        lat = geo.lat; lng = geo.lng;
+        lat = geo.lat;
+        lng = geo.lng;
       }
 
-      const id = crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2);
+      const id = crypto?.randomUUID
+        ? crypto.randomUUID()
+        : String(Date.now()) + "_" + Math.random().toString(16).slice(2);
 
       stops.push({
         id,
         name: name || "",
         address: addressRaw,
-        lat, lng,
+        lat,
+        lng,
         status: "pending",
         createdAt: Date.now()
       });
@@ -1832,7 +1220,7 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     }
   }
 
-    function setDone(id){
+  function setDone(id){
     const s = stops.find(x => x.id === id);
     if(!s) return;
 
@@ -1878,8 +1266,7 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     toast("全消去しました（入口記憶は残ります）");
   }
 
-  // ========= GPS watch + loss detection (②) =========
-  function setGpsPill(text, isWarn=false){
+  function setGpsPill(text, isWarn = false){
     const el = $("gpsPill");
     el.textContent = text;
     el.classList.toggle("warn", !!isWarn);
@@ -1890,142 +1277,7 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
       hdgPill.textContent = "方位：—";
       return;
     }
-    const d = Math.round(headingDeg);
-    hdgPill.textContent = `方位：${d}°`;
-  }
-
-  function startWatch(){
-    if(!navigator.geolocation){
-      $("geoPill").textContent = "位置情報：非対応";
-      setGpsPill("GPS：非対応", true);
-      toast("位置情報が使えません");
-      return;
-    }
-
-    if(watchId){
-      // already watching
-      toast("GPS監視中です");
-      return;
-    }
-
-    setGpsPill("GPS：監視開始…");
-    $("geoPill").textContent = "位置情報：監視中…";
-
-    watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
-      enableHighAccuracy: true,
-      timeout: 12000,
-      maximumAge: 2000
-    });
-
-    // loss monitor tick
-    if(!predictTimer){
-      predictTimer = setInterval(checkGpsLossAndPredict, PREDICT_STEP_MS);
-    }
-  }
-
-  function stopWatch(){
-    if(watchId){
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-    }
-    if(predictTimer){
-      clearInterval(predictTimer);
-      predictTimer = null;
-    }
-    setGpsPill("GPS：停止");
-    $("geoPill").textContent = "位置情報：未取得";
-  }
-
-  function onPos(pos){
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
-    lastFixAt = Date.now();
-
-    // speed (m/s) sometimes null
-    if(typeof pos.coords.speed === "number" && !Number.isNaN(pos.coords.speed)){
-      lastSpeedMps = pos.coords.speed;
-    }
-
-    // ④：ルート線が近ければスナップ（市街地の飛びを抑える）
-    const raw = { lat, lng };
-    const snapped = snapToRouteIfNear(raw);
-
-    currentLatLng = { lat: snapped.lat, lng: snapped.lng };
-
-    if(currentMarker){
-      currentMarker.setLatLng([currentLatLng.lat, currentLatLng.lng]);
-    }else{
-      currentMarker = L.circleMarker([currentLatLng.lat, currentLatLng.lng], {
-        radius: 8, weight: 2, opacity: 1, fillOpacity: .35
-      }).addTo(map).bindPopup("現在地");
-    }
-
-    // GPS復帰処理
-    if(gpsLost){
-      gpsLost = false;
-      lostNotified = false;
-      setGpsPill("GPS：復帰");
-      toast("GPSが復帰しました");
-      if(navigator.vibrate) navigator.vibrate([80, 60, 80]);
-      hidePredictMarker();
-    }else{
-      setGpsPill("GPS：OK");
-    }
-
-    $("geoPill").textContent = "位置情報：OK";
-    checkAutoArrival(pos.coords.accuracy);
-  }
-
-  function onPosErr(err){
-    console.warn(err);
-    $("geoPill").textContent = "位置情報：NG";
-    setGpsPill("GPS：NG", true);
-    toast("位置情報の取得に失敗（許可/電波/省電力設定を確認）");
-  }
-
-  function checkGpsLossAndPredict(){
-    if(!watchId) return;
-
-    const now = Date.now();
-    const dt = now - lastFixAt;
-
-    if(lastFixAt === 0){
-      setGpsPill("GPS：監視中…");
-      return;
-    }
-
-    // ロスト判定
-    if(dt >= GPS_LOST_MS){
-      if(!gpsLost){
-        gpsLost = true;
-        lostStartedAt = now;
-        lostBase = currentLatLng ? {
-          lat: currentLatLng.lat,
-          lng: currentLatLng.lng,
-          t: now,
-          speed: lastSpeedMps,
-          heading: headingDeg
-        } : null;
-
-        setGpsPill("GPS：ロスト", true);
-        if(!lostNotified){
-          lostNotified = true;
-          toast("GPSロスト中（トンネル等）。地図/目的地は表示されます");
-          if(navigator.vibrate) navigator.vibrate([180, 120, 180]);
-        }
-      }else{
-        setGpsPill("GPS：ロスト", true);
-      }
-
-      // ③ 推測位置（速度+方位がある場合のみ、90秒まで）
-      tryPredict(now);
-      return;
-    }
-
-    // OK継続
-    if(!gpsLost){
-      setGpsPill("GPS：OK");
-    }
+    hdgPill.textContent = `方位：${Math.round(headingDeg)}°`;
   }
 
   function showPredictMarker(latlng){
@@ -2056,7 +1308,6 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     if(elapsed <= 0) return;
 
     if(elapsed > PREDICT_MAX_MS){
-      // 推測期限終了
       hidePredictMarker();
       return;
     }
@@ -2065,54 +1316,187 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     const hdg = lostBase.heading;
 
     if(!(typeof sp === "number" && sp > 0.6 && typeof hdg === "number")){
-      // 速度/方位が取れないなら推測しない（誤差が大きいので）
       hidePredictMarker();
       return;
     }
 
-    // 直線推測：距離 = 速度 * 時間
-    const dist = sp * (elapsed/1000);
-    // ただし過大になりやすいので上限
-    const distCapped = Math.min(dist, 1200); // 1.2km上限
-
-    // 方位（0=N）から移動先を計算（簡易）
+    const dist = Math.min(sp * (elapsed / 1000), 1200);
     const rad = hdg * Math.PI / 180;
-    const dNorth = Math.cos(rad) * distCapped;
-    const dEast  = Math.sin(rad) * distCapped;
+    const dNorth = Math.cos(rad) * dist;
+    const dEast = Math.sin(rad) * dist;
 
-    // meters -> degrees approx
     const lat = lostBase.lat + (dNorth / 110540);
-    const lng = lostBase.lng + (dEast  / (111320 * Math.cos(lostBase.lat * Math.PI/180)));
+    const lng = lostBase.lng + (dEast / (111320 * Math.cos(lostBase.lat * Math.PI / 180)));
 
-    // ④の代替：推測点もルート線に近ければスナップ
     const snapped = snapToRouteIfNear({ lat, lng });
-
     showPredictMarker(snapped);
   }
 
-  // ========= Compass (②補助) =========
+  function checkGpsLossAndPredict(){
+    if(!watchId) return;
+
+    const now = Date.now();
+    const dt = now - lastFixAt;
+
+    if(lastFixAt === 0){
+      setGpsPill("GPS：監視中…");
+      return;
+    }
+
+    if(dt >= GPS_LOST_MS){
+      if(!gpsLost){
+        gpsLost = true;
+        lostBase = currentLatLng ? {
+          lat: currentLatLng.lat,
+          lng: currentLatLng.lng,
+          t: now,
+          speed: lastSpeedMps,
+          heading: headingDeg
+        } : null;
+
+        setGpsPill("GPS：ロスト", true);
+        if(!lostNotified){
+          lostNotified = true;
+          toast("GPSロスト中（トンネル等）。地図/目的地は表示されます");
+          if(navigator.vibrate) navigator.vibrate([180, 120, 180]);
+        }
+      }else{
+        setGpsPill("GPS：ロスト", true);
+      }
+
+      tryPredict(now);
+      return;
+    }
+
+    if(!gpsLost){
+      setGpsPill("GPS：OK");
+    }
+  }
+
+  function checkAutoArrival(posAccuracyM){
+    const now = Date.now();
+    if(now - lastAutoDoneAt < AUTO_DONE_COOLDOWN_MS) return;
+
+    if(typeof posAccuracyM === "number" && posAccuracyM > ARRIVE_MAX_ACC_M){
+      arriveInsideSince = 0;
+      return;
+    }
+
+    const next = getNextPendingStop();
+    if(!next || !currentLatLng){
+      arriveInsideSince = 0;
+      return;
+    }
+
+    const d = distanceMeters(
+      { lat: currentLatLng.lat, lng: currentLatLng.lng },
+      { lat: next.lat, lng: next.lng }
+    );
+
+    if(d <= ARRIVE_RADIUS_M){
+      if(!arriveInsideSince) arriveInsideSince = now;
+
+      if(now - arriveInsideSince >= ARRIVE_HOLD_MS){
+        arriveInsideSince = 0;
+        lastAutoDoneAt = now;
+        toast(`到着判定 ✅（${Math.round(d)}m）`);
+        setDone(next.id);
+        if(navigator.vibrate) navigator.vibrate([120, 80, 120]);
+      }
+    }else{
+      arriveInsideSince = 0;
+    }
+  }
+
+  function onPos(pos){
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    lastFixAt = Date.now();
+
+    if(typeof pos.coords.speed === "number" && !Number.isNaN(pos.coords.speed)){
+      lastSpeedMps = pos.coords.speed;
+    }
+
+    const raw = { lat, lng };
+    const snapped = snapToRouteIfNear(raw);
+    currentLatLng = { lat: snapped.lat, lng: snapped.lng };
+
+    if(currentMarker){
+      currentMarker.setLatLng([currentLatLng.lat, currentLatLng.lng]);
+    }else{
+      currentMarker = L.circleMarker([currentLatLng.lat, currentLatLng.lng], {
+        radius: 8,
+        weight: 2,
+        opacity: 1,
+        fillOpacity: .35
+      }).addTo(map).bindPopup("現在地");
+    }
+
+    if(gpsLost){
+      gpsLost = false;
+      lostNotified = false;
+      setGpsPill("GPS：復帰");
+      toast("GPSが復帰しました");
+      if(navigator.vibrate) navigator.vibrate([80, 60, 80]);
+      hidePredictMarker();
+    }else{
+      setGpsPill("GPS：OK");
+    }
+
+    $("geoPill").textContent = "位置情報：OK";
+    checkAutoArrival(pos.coords.accuracy);
+  }
+
+  function onPosErr(err){
+    console.warn(err);
+    $("geoPill").textContent = "位置情報：NG";
+    setGpsPill("GPS：NG", true);
+    toast("位置情報の取得に失敗（許可/電波/省電力設定を確認）");
+  }
+
+  function startWatch(){
+    if(!navigator.geolocation){
+      $("geoPill").textContent = "位置情報：非対応";
+      setGpsPill("GPS：非対応", true);
+      toast("位置情報が使えません");
+      return;
+    }
+
+    if(watchId){
+      toast("GPS監視中です");
+      return;
+    }
+
+    setGpsPill("GPS：監視開始…");
+    $("geoPill").textContent = "位置情報：監視中…";
+
+    watchId = navigator.geolocation.watchPosition(onPos, onPosErr, {
+      enableHighAccuracy:true,
+      timeout:12000,
+      maximumAge:2000
+    });
+
+    if(!predictTimer){
+      predictTimer = setInterval(checkGpsLossAndPredict, PREDICT_STEP_MS);
+    }
+  }
+
   function initCompass(){
-    // iOSはユーザー操作で許可が必要な場合あり
     const handler = (e) => {
       let h = null;
-      // iOS: webkitCompassHeading (0=N)
       if(typeof e.webkitCompassHeading === "number"){
         h = e.webkitCompassHeading;
       }else if(typeof e.alpha === "number"){
-        // alpha: 0..360 (device orientation). 環境によって北基準でないこともあるので「補助」扱い
         h = 360 - e.alpha;
       }
-      if(h == null || Number.isNaN(h)) return;
 
+      if(h == null || Number.isNaN(h)) return;
       headingDeg = (h + 360) % 360;
-      lastHeadingAt = Date.now();
       updateHeadingPill();
     };
 
-    // 許可が必要な環境（主にiOS）
     if(typeof DeviceOrientationEvent !== "undefined" &&
        typeof DeviceOrientationEvent.requestPermission === "function"){
-      // 許可は「ユーザー操作イベント」内で呼ぶ必要があるので、現在地ボタン内で呼ぶ
       window.__requestCompassPermission = async () => {
         try{
           const p = await DeviceOrientationEvent.requestPermission();
@@ -2123,30 +1507,35 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
             toast("方位センサーが許可されませんでした");
           }
         }catch(e){
-          console.warn(e);
           toast("方位センサーの許可に失敗");
         }
       };
     }else{
-      // Android等：そのまま購読
       window.addEventListener("deviceorientationabsolute", handler, true);
       window.addEventListener("deviceorientation", handler, true);
     }
   }
 
-  // ========= Speech =========
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recog = null;
+
   function initSpeech(){
-    if(!SpeechRecognition){ $("speechPill").textContent = "音声：非対応"; return; }
+    if(!SpeechRecognition){
+      $("speechPill").textContent = "音声：非対応";
+      return;
+    }
     $("speechPill").textContent = "音声：OK";
     recog = new SpeechRecognition();
     recog.lang = "ja-JP";
     recog.interimResults = false;
     recog.maxAlternatives = 1;
   }
+
   function speakToInput(inputEl){
-    if(!recog){ toast("音声入力が使えません（Chrome系推奨）"); return; }
+    if(!recog){
+      toast("音声入力が使えません（Chrome系推奨）");
+      return;
+    }
     try{ recog.abort(); }catch(e){}
     toast("話してください…");
     recog.onresult = (ev) => {
@@ -2159,19 +1548,15 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     recog.start();
   }
 
-  
-  // ========= PWA register (①) =========
   async function registerSW(){
     if(!("serviceWorker" in navigator)) return;
     try{
       await navigator.serviceWorker.register("/sw.js");
-      // toast("オフライン対応（最小）を有効化しました"); // 鬱陶しければOFF
     }catch(e){
       console.warn("SW register failed", e);
     }
   }
 
-  // ========= Event bindings =========
   $("addBtn").addEventListener("click", addStop);
   $("clearBtn").addEventListener("click", clearAll);
   $("fitBtn").addEventListener("click", fitAll);
@@ -2180,13 +1565,24 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
   $("cancelAdjustBtn").addEventListener("click", () => cancelAdjust(false));
   $("confirmAdjustBtn").addEventListener("click", confirmAdjust);
 
-  $("name").addEventListener("keydown", (e) => { if(e.key === "Enter") $("addr").focus(); });
-  $("addr").addEventListener("keydown", (e) => { if(e.key === "Enter") addStop(); });
-  $("zip").addEventListener("keydown", (e) => { if(e.key === "Enter") $("zipBtn").click(); });
+  $("name").addEventListener("keydown", (e) => {
+    if(e.key === "Enter") $("addr").focus();
+  });
+  $("addr").addEventListener("keydown", (e) => {
+    if(e.key === "Enter") addStop();
+  });
+  $("zip").addEventListener("keydown", (e) => {
+    if(e.key === "Enter") $("zipBtn").click();
+  });
 
   $("zipBtn").addEventListener("click", async () => {
     const zip = $("zip").value.trim();
-    if(!zip){ toast("郵便番号を入力してください"); $("zip").focus(); return; }
+    if(!zip){
+      toast("郵便番号を入力してください");
+      $("zip").focus();
+      return;
+    }
+
     $("zipBtn").disabled = true;
     try{
       const addr = await fetchAddressByZip(zip);
@@ -2207,6 +1603,7 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
   $("list").addEventListener("click", (e) => {
     const btn = e.target.closest("button");
     if(!btn) return;
+
     const id = btn.getAttribute("data-id");
     const action = btn.getAttribute("data-action");
     if(!id || !action) return;
@@ -2217,19 +1614,15 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
     if(action === "adjust") startAdjust(id);
   });
 
-  // 現在地ボタン：GPS監視を開始（ロスト検知の前提）
   $("locBtn").addEventListener("click", async () => {
-    // iOSコンパス許可（必要な場合のみ）
     if(typeof window.__requestCompassPermission === "function"){
       await window.__requestCompassPermission();
       window.__requestCompassPermission = null;
     }
     startWatch();
-    // 現在地へ寄せる（初回fixが来たら勝手に更新される）
-    toast("GPS監視を開始しました（トンネルでロスト検知します）");
+    toast("GPS監視を開始しました");
   });
 
-  // ========= Boot =========
   load();
   initSpeech();
   initCompass();
@@ -2247,14 +1640,7 @@ $("ocrCaptureBtn").addEventListener("click", captureAddress);
 
   applyQueryToInputs();
   registerSW();
-
-  // ページ離脱時にGPS監視・カメラを確実に停止
-  window.addEventListener("beforeunload", () => {
-    stopWatch();
-    stopOCR();
-  });
-
-})()
+})();
 </script>
 </body>
 </html>
