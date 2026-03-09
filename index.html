@@ -295,8 +295,13 @@
         <input id="addr" type="text" placeholder="住所" autocomplete="off">
       </div>
 
+      
       <div class="row" style="justify-content:space-between;">
-        <button class="btn primary" id="addBtn">＋ 登録</button>
+        <div class="row" style="flex-wrap:wrap;">
+          <button class="btn primary" id="addBtn">＋ 登録</button>
+          <button class="btn small warn" id="csvBtn">📄 CSV読込</button>
+          <input id="csvFile" type="file" accept=".csv,text/csv" style="display:none;">
+        </div>
         <div class="row">
           <button class="btn small" id="locBtn">📍 現在地</button>
           <button class="btn small danger" id="clearBtn">🗑 全消去</button>
@@ -1220,6 +1225,181 @@
     }
   }
 
+    function parseCsvLine(line){
+    const result = [];
+    let cur = "";
+    let inQuotes = false;
+
+    for(let i=0; i<line.length; i++){
+      const ch = line[i];
+
+      if(ch === '"'){
+        if(inQuotes && line[i+1] === '"'){
+          cur += '"';
+          i++;
+        }else{
+          inQuotes = !inQuotes;
+        }
+      }else if(ch === "," && !inQuotes){
+        result.push(cur);
+        cur = "";
+      }else{
+        cur += ch;
+      }
+    }
+    result.push(cur);
+    return result.map(v => v.trim());
+  }
+
+  function parseCsvText(text){
+    const lines = text
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .split("\n")
+      .filter(line => line.trim() !== "");
+
+    return lines.map(parseCsvLine);
+  }
+
+  function detectCsvColumns(rows){
+    if(!rows.length) return { startIndex:0, nameCol:0, addrCol:1 };
+
+    const header = rows[0].map(v => (v || "").trim().toLowerCase());
+
+    const nameCandidates = ["name", "名前", "氏名", "宛名", "送付先名"];
+    const addrCandidates = ["address", "住所", "所在地", "届け先住所"];
+
+    let nameCol = -1;
+    let addrCol = -1;
+
+    for(let i=0; i<header.length; i++){
+      const h = header[i];
+      if(nameCol === -1 && nameCandidates.includes(h)) nameCol = i;
+      if(addrCol === -1 && addrCandidates.includes(h)) addrCol = i;
+    }
+
+    if(nameCol !== -1 && addrCol !== -1){
+      return { startIndex:1, nameCol, addrCol };
+    }
+
+    // ヘッダが無い場合は 1列目=名前 2列目=住所 とみなす
+    return { startIndex:0, nameCol:0, addrCol:1 };
+  }
+
+  async function addStopRecord(name, addressRaw){
+    const address = (addressRaw || "").trim();
+    if(!address) return { ok:false, reason:"住所なし" };
+
+    const remembered = loadPinMemory(address);
+    let lat, lng;
+
+    if(remembered){
+      lat = Number(remembered.lat);
+      lng = Number(remembered.lng);
+    }else{
+      const geo = await geocodeWithFallback(address);
+      if(!geo){
+        return { ok:false, reason:"座標化失敗", name, address };
+      }
+      lat = geo.lat;
+      lng = geo.lng;
+    }
+
+    const id = crypto?.randomUUID
+      ? crypto.randomUUID()
+      : String(Date.now()) + "_" + Math.random().toString(16).slice(2);
+
+    stops.push({
+      id,
+      name: (name || "").trim(),
+      address,
+      lat,
+      lng,
+      status: "pending",
+      createdAt: Date.now()
+    });
+
+    return { ok:true };
+  }
+
+  async function importCsvFile(file){
+    if(!file){
+      toast("CSVファイルを選択してください");
+      return;
+    }
+
+    const originalBtnText = $("csvBtn").textContent;
+    $("csvBtn").disabled = true;
+    $("csvBtn").textContent = "…読込中";
+
+    try{
+      let text = await file.text();
+
+      // UTF-8で文字化けするCSV対策（Shift_JIS想定）
+      if(text.includes("�")){
+        const buf = await file.arrayBuffer();
+        try{
+          text = new TextDecoder("shift-jis").decode(buf);
+        }catch(e){}
+      }
+
+      const rows = parseCsvText(text);
+      if(!rows.length){
+        toast("CSVが空です");
+        return;
+      }
+
+      const { startIndex, nameCol, addrCol } = detectCsvColumns(rows);
+
+      let success = 0;
+      let fail = 0;
+      const failedRows = [];
+
+      for(let i=startIndex; i<rows.length; i++){
+        const row = rows[i];
+        const name = row[nameCol] ?? "";
+        const address = row[addrCol] ?? "";
+
+        if(!address.trim()) continue;
+
+        const result = await addStopRecord(name, address);
+        if(result.ok){
+          success++;
+        }else{
+          fail++;
+          failedRows.push(`${i+1}行目: ${address}`);
+        }
+      }
+
+      save();
+      redrawMarkers();
+      renderList();
+
+      if(success > 0 && stops.length){
+        const pending = stops.filter(s => s.status === "pending");
+        if(pending.length){
+          const latlngs = pending.map(s => [s.lat, s.lng]);
+          map.fitBounds(L.latLngBounds(latlngs).pad(0.22));
+        }
+      }
+
+      if(fail === 0){
+        toast(`CSV取込完了 ✅ ${success}件追加`);
+      }else{
+        console.warn("CSV取込失敗行:", failedRows);
+        toast(`CSV取込完了：成功 ${success}件 / 失敗 ${fail}件`);
+      }
+
+    }catch(e){
+      console.error(e);
+      toast("CSV読込に失敗しました");
+    }finally{
+      $("csvBtn").disabled = false;
+      $("csvBtn").textContent = originalBtnText;
+      $("csvFile").value = "";
+    }
+  }
+
   function setDone(id){
     const s = stops.find(x => x.id === id);
     if(!s) return;
@@ -1612,7 +1792,11 @@
     if(action === "done") setDone(id);
     if(action === "focus") focusStop(id);
     if(action === "adjust") startAdjust(id);
+      
   });
+
+  
+  
 
   $("locBtn").addEventListener("click", async () => {
     if(typeof window.__requestCompassPermission === "function"){
@@ -1622,7 +1806,16 @@
     startWatch();
     toast("GPS監視を開始しました");
   });
+  
+  $("csvBtn").addEventListener("click", () => {
+    $("csvFile").click();
+  });
 
+  $("csvFile").addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    await importCsvFile(file);
+  });
+    
   load();
   initSpeech();
   initCompass();
